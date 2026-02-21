@@ -399,12 +399,16 @@ function WorkoutDashboard() {
       )
 
       if (shouldMoveToTomorrow) {
-        const movedSessionId = await moveScheduledSessionToDate(sessionId, nextDate)
-        setSearch((prev) => ({
-          ...prev,
-          date: nextDate,
-          session: prev.session === sessionId ? movedSessionId : prev.session,
-        }))
+        try {
+          const movedSessionId = await moveScheduledSessionToDate(sessionId, nextDate)
+          setSearch((prev) => ({
+            ...prev,
+            date: nextDate,
+            session: prev.session === sessionId ? movedSessionId : prev.session,
+          }))
+        } catch {
+          setErrorMessage('Unable to move session to next day.')
+        }
       }
     } catch {
       setErrorMessage('Unable to skip session.')

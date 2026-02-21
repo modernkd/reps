@@ -4,6 +4,7 @@ import {
   exerciseTemplatesCollection,
   generateScheduleForRange,
   importStarterTemplate,
+  moveScheduledSessionToDate,
   planDaysCollection,
   planTemplatesCollection,
   scheduledSessionsCollection,
@@ -70,5 +71,53 @@ describe('template and scheduling', () => {
 
     expect(inserted).toBeGreaterThan(0)
     expect(insertedAgain).toBe(0)
+  })
+
+  it('moves a skipped session to the next day and keeps the edited plan', async () => {
+    await importStarterTemplate()
+    await planTemplatesCollection.preload()
+    const template = planTemplatesCollection.toArray[0]
+
+    await generateScheduleForRange({
+      templateId: template!.id,
+      from: '2026-02-02',
+      to: '2026-02-03',
+    })
+
+    await scheduledSessionsCollection.preload()
+    const originalSession = scheduledSessionsCollection.toArray[0]
+    expect(originalSession).toBeDefined()
+
+    await sessionPlansCollection.preload()
+    await sessionPlansCollection.insert({
+      id: originalSession!.id,
+      sessionId: originalSession!.id,
+      title: 'Edited plan',
+      notes: 'Keep this',
+      exercises: [],
+      updatedAt: '2026-02-02T00:00:00.000Z',
+    }).isPersisted.promise
+
+    const movedId = await moveScheduledSessionToDate(
+      originalSession!.id,
+      '2026-02-03',
+    )
+
+    await Promise.all([
+      scheduledSessionsCollection.preload(),
+      sessionPlansCollection.preload(),
+    ])
+
+    expect(scheduledSessionsCollection.has(originalSession!.id)).toBe(false)
+    expect(scheduledSessionsCollection.has(movedId)).toBe(true)
+
+    const movedSession = scheduledSessionsCollection.get(movedId)
+    expect(movedSession?.date).toBe('2026-02-03')
+    expect(movedSession?.status).toBe('planned')
+
+    expect(sessionPlansCollection.has(originalSession!.id)).toBe(false)
+    const movedPlan = sessionPlansCollection.get(movedId)
+    expect(movedPlan?.title).toBe('Edited plan')
+    expect(movedPlan?.notes).toBe('Keep this')
   })
 })
