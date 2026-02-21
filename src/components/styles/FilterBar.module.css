@@ -13,6 +13,12 @@
   border-radius: 999px;
   padding: 0.45rem 0.85rem;
   font-size: 0.9rem;
+  min-height: 2.2rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   cursor: pointer;
   transition: transform 140ms ease, background-color 140ms ease;
 }

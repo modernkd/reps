@@ -1,7 +1,15 @@
 .wrapper {
+  margin-top: auto;
+  border-top: 1px solid color-mix(in srgb, var(--ink-300) 55%, transparent);
+  background: color-mix(in srgb, var(--surface-0) 86%, transparent);
+}
+
+.inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.85rem 1rem 1rem;
   display: flex;
   justify-content: flex-end;
-  margin-top: 0.15rem;
 }
 
 .controls {
@@ -16,6 +24,7 @@
 }
 
 .iconButton {
+  flex: 0 0 2.6rem;
   width: 2.6rem;
   height: 2.6rem;
   border-radius: 999px;
@@ -47,6 +56,8 @@
 
 .iconTrack {
   position: relative;
+  display: grid;
+  place-items: center;
   width: 1.2rem;
   height: 1.2rem;
 }
@@ -76,6 +87,9 @@
 
 .langTrack {
   position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
   width: 1.65rem;
   height: 1rem;
   perspective: 280px;
@@ -111,7 +125,8 @@
 }
 
 @media (max-width: 760px) {
-  .wrapper {
+  .inner {
+    padding: 0.75rem 0.75rem 0.9rem;
     justify-content: center;
   }
 }

@@ -1,6 +1,8 @@
 .page {
   min-height: 100vh;
   min-height: 100svh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--accent-200) 34%, transparent), transparent 55%),
     radial-gradient(circle at 100% 20%, color-mix(in srgb, var(--accent-100) 55%, transparent), transparent 46%),
@@ -8,6 +10,8 @@
 }
 
 .container {
+  flex: 1;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   padding: 1.25rem 1rem 2.5rem;

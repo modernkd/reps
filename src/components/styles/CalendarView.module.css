@@ -126,6 +126,16 @@
   background: color-mix(in srgb, var(--accent-300) 10%, var(--surface-0));
 }
 
+.pastCompleted {
+  background: color-mix(in srgb, #2f9d45 18%, var(--surface-0));
+  border-color: color-mix(in srgb, #2f9d45 45%, var(--ink-200));
+}
+
+.pastSkipped {
+  background: color-mix(in srgb, #ee8f2a 20%, var(--surface-0));
+  border-color: color-mix(in srgb, #ee8f2a 45%, var(--ink-200));
+}
+
 @media (hover: hover) and (pointer: fine) {
   .day:hover {
     transform: translateY(-1px);

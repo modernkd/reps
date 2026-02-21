@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { format, parseISO } from 'date-fns'
 
+import { todayIso } from '@/lib/date'
 import type { AppLanguage } from '@/lib/i18n'
 import { getCopy, getDateLocale } from '@/lib/i18n'
 import type { CalendarDayModel } from '@/lib/types'
@@ -27,6 +28,7 @@ export function CalendarView({
   const copy = getCopy(language)
   const dateLocale = getDateLocale(language)
   const monthDate = parseISO(`${month}-01`)
+  const today = todayIso()
 
   const indexByDate = new Map(model.map((day, index) => [day.date, index]))
 
@@ -96,6 +98,16 @@ export function CalendarView({
           const count = day.workouts.length
           const plannedCount = day.sessions.filter((item) => item.status !== 'completed').length
           const isSelected = selectedDate === day.date
+          const isPastDay = day.date < today
+          const isCompleted = count > 0 || day.sessions.some((session) => session.status === 'completed')
+          const isSkipped = day.sessions.some((session) => session.status === 'skipped')
+          const pastStatusClass = isPastDay
+            ? isCompleted
+              ? styles.pastCompleted
+              : isSkipped
+                ? styles.pastSkipped
+                : null
+            : null
 
           return (
             <button
@@ -108,8 +120,9 @@ export function CalendarView({
               className={clsx(
                 styles.day,
                 !day.inCurrentMonth && styles.outOfMonth,
-                isSelected && styles.selected,
                 count > 0 && styles.hasWorkout,
+                pastStatusClass,
+                isSelected && styles.selected,
               )}
             >
               <span className={styles.dayNumber}>
