@@ -8,6 +8,7 @@ import {
   localizeSessionStatus,
   localizeWorkoutTypeName,
 } from '@/lib/i18n'
+import { estimateWorkoutCaloriesBurned } from '@/lib/calories'
 import type { PlanDay, ScheduledSession, Workout, WorkoutType } from '@/lib/types'
 
 import styles from './styles/WorkoutDetailPanel.module.css'
@@ -151,6 +152,7 @@ export function WorkoutDetailPanel({
           <ul className={styles.list}>
             {workouts.map((workout) => {
               const type = typeById.get(workout.type)
+              const estimatedCalories = estimateWorkoutCaloriesBurned(workout)
               const setWeights = workout.sessionSummary?.setLogs
                 .map((setLog) => setLog.weightKg)
                 .filter((value): value is number => typeof value === 'number')
@@ -176,6 +178,7 @@ export function WorkoutDetailPanel({
                         ? ` · ${copy.details.targetWeightLabel} ${workout.targetWeightKg} kg`
                         : ''}
                       {workout.distanceKm ? ` · ${workout.distanceKm} km` : ''}
+                      {` · ${copy.details.estimatedCalories(estimatedCalories)}`}
                       {avgWeight ? ` · ${avgWeight} ${copy.details.avgPerSet}` : ''}
                       {workout.intensity
                         ? ` · ${localizeIntensity(workout.intensity, language)}`

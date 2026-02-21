@@ -1,10 +1,26 @@
 import { differenceInSeconds, formatDistanceStrict, parseISO } from 'date-fns'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 
+import { Modal } from '@/components/Modal'
+import { estimateWorkoutCaloriesBurned } from '@/lib/calories'
 import { nowIso } from '@/lib/date'
+import {
+  readFileAsDataUrl,
+  saveUploadedExerciseImage,
+} from '@/lib/exerciseImages'
 import type { AppLanguage } from '@/lib/i18n'
 import { getCopy, getDateLocale } from '@/lib/i18n'
-import { getExerciseVariants } from '@/lib/variants'
+import {
+  addGuidedRestIncrement,
+  GUIDED_REST_DEFAULT_SEC,
+  GUIDED_REST_INCREMENT_SEC,
+} from '@/lib/restTimer'
+import {
+  getCatalogExerciseVariants,
+  isCustomExerciseVariant,
+} from '@/lib/variants'
+import { useExerciseReferenceImage } from '@/lib/useExerciseReferenceImage'
+import { inferWorkoutTypeFromPlanDay } from '@/lib/workoutType'
 import type {
   ActiveSessionDraft,
   ExerciseTemplate,
@@ -30,7 +46,7 @@ type GuidedWorkoutViewProps = {
 
 function getRemainingSeconds(restEndAt?: string, explicitRemaining?: number): number {
   if (!restEndAt) {
-    return explicitRemaining ?? 0
+    return explicitRemaining ?? GUIDED_REST_DEFAULT_SEC
   }
 
   const delta = differenceInSeconds(parseISO(restEndAt), new Date())
@@ -60,6 +76,15 @@ function nextSetPosition(
   return { exerciseIndex: currentExerciseIndex, setIndex: currentSetIndex, finished: true }
 }
 
+function variantSuggestionListId(exerciseId: string): string {
+  return `guided_variant_${exerciseId}`
+}
+
+type CompletionPreview = {
+  summary: SessionSummary
+  estimatedCalories: number
+}
+
 export function GuidedWorkoutView({
   language,
   session,
@@ -86,11 +111,28 @@ export function GuidedWorkoutView({
   const [weightKg, setWeightKg] = useState(0)
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [variantInput, setVariantInput] = useState('')
+  const [imageRefreshKey, setImageRefreshKey] = useState(0)
+  const [completionPreview, setCompletionPreview] = useState<CompletionPreview | null>(
+    null,
+  )
 
   const currentExercise = exercises[currentExerciseIndex]
-  const currentVariants = currentExercise
-    ? getExerciseVariants(currentExercise.id, currentExercise.name)
+  const currentVariantOptions = currentExercise
+    ? getCatalogExerciseVariants(currentExercise.id)
     : []
+  const typedVariant = variantInput.trim()
+  const customExercise = currentExercise
+    ? isCustomExerciseVariant(currentExercise.id, typedVariant)
+    : false
+  const referenceExerciseName = typedVariant || currentExercise?.name || ''
+  const { image: referenceImage, isLoading: isReferenceImageLoading } =
+    useExerciseReferenceImage(
+      currentExercise?.id ?? '',
+      referenceExerciseName,
+      imageRefreshKey,
+    )
+
   const totalSetsTarget = exercises.reduce((acc, exercise) => acc + exercise.sets, 0)
   const completedSets = setLogs.length
 
@@ -101,6 +143,15 @@ export function GuidedWorkoutView({
 
     setRestSecLeft(getRemainingSeconds(draft.restEndAt, draft.timerRemainingSec))
   }, [draft.restEndAt, draft.timerRemainingSec])
+
+  useEffect(() => {
+    if (!currentExercise) {
+      setVariantInput('')
+      return
+    }
+
+    setVariantInput(currentExercise.name)
+  }, [currentExercise?.id, currentExercise?.name])
 
   useEffect(() => {
     if (timerPaused || restSecLeft <= 0) {
@@ -146,20 +197,68 @@ export function GuidedWorkoutView({
     }))
   }
 
+  const commitVariantInput = async (): Promise<string | undefined> => {
+    if (!currentExercise) {
+      return undefined
+    }
+
+    const nextName = variantInput.trim()
+    if (!nextName) {
+      setVariantInput(currentExercise.name)
+      return currentExercise.name
+    }
+
+    if (nextName === currentExercise.name) {
+      return currentExercise.name
+    }
+
+    try {
+      await onSwapExerciseVariant(currentExerciseIndex, nextName)
+      return nextName
+    } catch {
+      setVariantInput(currentExercise.name)
+      return currentExercise.name
+    }
+  }
+
+  const handleUploadCustomImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.currentTarget.value = ''
+
+    if (!file) {
+      return
+    }
+
+    const resolvedName = await commitVariantInput()
+    if (!resolvedName?.trim()) {
+      return
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      saveUploadedExerciseImage(resolvedName, dataUrl)
+      setImageRefreshKey((value) => value + 1)
+    } catch {
+      // Keep guided flow active even if upload cannot be processed.
+    }
+  }
+
   const handleCompleteSet = async () => {
     if (!currentExercise) {
       return
     }
 
+    const committedName = await commitVariantInput()
+    const exerciseName = committedName?.trim() ? committedName : currentExercise.name
     const targetReps = currentExercise.maxReps ?? currentExercise.minReps
     const nextLog: SetLog = {
       exerciseId: currentExercise.id,
-      exerciseName: currentExercise.name,
+      exerciseName,
       setIndex: currentSetIndex,
       targetReps,
       actualReps: Math.max(0, reps),
       weightKg: weightKg > 0 ? weightKg : undefined,
-      restSecUsed: currentExercise.restSecDefault ?? 75,
+      restSecUsed: GUIDED_REST_DEFAULT_SEC,
     }
 
     const nextSetLogs = [...setLogs, nextLog]
@@ -168,7 +267,7 @@ export function GuidedWorkoutView({
       currentSetIndex,
       exercises,
     )
-    const nextRestSec = currentExercise.restSecDefault ?? 75
+    const nextRestSec = GUIDED_REST_DEFAULT_SEC
 
     setSetLogs(nextSetLogs)
     setRestSecLeft(nextRestSec)
@@ -201,26 +300,45 @@ export function GuidedWorkoutView({
     })
   }
 
-  const handleFinish = async () => {
+  const buildCompletionPreview = (): CompletionPreview => {
+    const endedAt = nowIso()
+    const minutes = Math.max(
+      1,
+      Math.round(
+        differenceInSeconds(parseISO(endedAt), parseISO(draft.startedAt)) / 60,
+      ),
+    )
+    const summary: SessionSummary = {
+      startedAt: draft.startedAt,
+      endedAt,
+      totalDurationMin: minutes,
+      setLogs,
+    }
+
+    const estimatedCalories = estimateWorkoutCaloriesBurned({
+      durationMin: summary.totalDurationMin,
+      type: inferWorkoutTypeFromPlanDay(planDay),
+      sessionSummary: summary,
+    })
+
+    return {
+      summary,
+      estimatedCalories,
+    }
+  }
+
+  const handleFinish = () => {
+    setCompletionPreview(buildCompletionPreview())
+  }
+
+  const handleConfirmFinish = async () => {
+    if (!completionPreview) {
+      return
+    }
+
     setIsSubmitting(true)
     try {
-      const endedAt = nowIso()
-      const minutes = Math.max(
-        1,
-        Math.round(
-          differenceInSeconds(parseISO(endedAt), parseISO(draft.startedAt)) / 60,
-        ),
-      )
-
-      await onComplete(
-        {
-          startedAt: draft.startedAt,
-          endedAt,
-          totalDurationMin: minutes,
-          setLogs,
-        },
-        notes || undefined,
-      )
+      await onComplete(completionPreview.summary, notes || undefined)
     } finally {
       setIsSubmitting(false)
     }
@@ -251,19 +369,60 @@ export function GuidedWorkoutView({
         {currentExercise ? (
           <label className={styles.variantControl}>
             {copy.guided.variant}
-            <select
-              value={currentExercise.name}
-              onChange={(event) =>
-                onSwapExerciseVariant(currentExerciseIndex, event.target.value)
-              }
-            >
-              {currentVariants.map((variant) => (
-                <option key={variant} value={variant}>
-                  {variant}
-                </option>
+            <input
+              list={variantSuggestionListId(currentExercise.id)}
+              value={variantInput}
+              placeholder={copy.guided.exerciseVariantPlaceholder}
+              onChange={(event) => setVariantInput(event.target.value)}
+              onBlur={() => {
+                void commitVariantInput()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void commitVariantInput()
+                }
+              }}
+            />
+            <datalist id={variantSuggestionListId(currentExercise.id)}>
+              {currentVariantOptions.map((variant) => (
+                <option key={variant} value={variant} />
               ))}
-            </select>
+            </datalist>
           </label>
+        ) : null}
+
+        {currentExercise ? (
+          <section className={styles.referenceCard}>
+            {referenceImage ? (
+              <img
+                src={referenceImage.url}
+                alt={copy.guided.referenceImageAlt(referenceExerciseName)}
+                loading="lazy"
+                className={styles.referenceImage}
+              />
+            ) : (
+              <p className={styles.referenceHint}>
+                {isReferenceImageLoading
+                  ? copy.guided.loadingReferenceImage
+                  : copy.guided.missingReferenceImage}
+              </p>
+            )}
+
+            {customExercise ? (
+              <>
+                <p className={styles.referenceHint}>{copy.guided.customExerciseHint}</p>
+                <label className={styles.uploadButton}>
+                  {copy.guided.uploadCustomImage}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadCustomImage}
+                  />
+                </label>
+              </>
+            ) : null}
+          </section>
         ) : null}
 
         <div className={styles.repControls}>
@@ -319,8 +478,8 @@ export function GuidedWorkoutView({
           >
             {timerPaused ? copy.guided.resume : copy.guided.pause}
           </button>
-          <button type="button" onClick={() => updateTimer(restSecLeft + 15, false)}>
-            +15s
+          <button type="button" onClick={() => updateTimer(addGuidedRestIncrement(restSecLeft), false)}>
+            +{GUIDED_REST_INCREMENT_SEC}s
           </button>
           <button type="button" onClick={() => updateTimer(0, true)}>
             {copy.guided.reset}
@@ -348,6 +507,65 @@ export function GuidedWorkoutView({
           {isSubmitting ? copy.common.saving : copy.guided.finishWorkout}
         </button>
       </footer>
+
+      <Modal
+        title={copy.guided.summaryTitle}
+        isOpen={completionPreview !== null}
+        onClose={() => {
+          if (isSubmitting) {
+            return
+          }
+
+          setCompletionPreview(null)
+        }}
+        closeLabel={copy.common.close}
+      >
+        {completionPreview ? (
+          <>
+            <dl className={styles.summaryList}>
+              <div className={styles.summaryRow}>
+                <dt>{copy.guided.summaryDuration}</dt>
+                <dd>
+                  {copy.guided.summaryDurationValue(
+                    completionPreview.summary.totalDurationMin,
+                  )}
+                </dd>
+              </div>
+              <div className={styles.summaryRow}>
+                <dt>{copy.guided.summarySets}</dt>
+                <dd>
+                  {copy.guided.setsLogged(
+                    completionPreview.summary.setLogs.length,
+                    totalSetsTarget,
+                  )}
+                </dd>
+              </div>
+              <div className={styles.summaryRow}>
+                <dt>{copy.guided.summaryCalories}</dt>
+                <dd>{copy.details.estimatedCalories(completionPreview.estimatedCalories)}</dd>
+              </div>
+            </dl>
+            <div className={styles.summaryActions}>
+              <button
+                type="button"
+                className={styles.summaryBack}
+                onClick={() => setCompletionPreview(null)}
+                disabled={isSubmitting}
+              >
+                {copy.guided.summaryBack}
+              </button>
+              <button
+                type="button"
+                className={styles.finish}
+                onClick={handleConfirmFinish}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? copy.common.saving : copy.guided.summaryConfirm}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </Modal>
     </section>
   )
 }

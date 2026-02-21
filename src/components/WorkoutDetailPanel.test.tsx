@@ -44,4 +44,34 @@ describe('WorkoutDetailPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Clear after' })).toBeDisabled()
   })
+
+  it('shows estimated calories for completed workouts', () => {
+    const props = createProps()
+    props.workoutTypes = [{ id: 'lift', name: 'Lift', color: '#ef476f' }]
+    props.workouts = [
+      {
+        id: 'workout-1',
+        date: '2026-02-10',
+        type: 'lift',
+        durationMin: 45,
+        intensity: 'medium',
+        createdAt: '2026-02-10T08:00:00.000Z',
+        updatedAt: '2026-02-10T08:00:00.000Z',
+        sessionSummary: {
+          startedAt: '2026-02-10T08:00:00.000Z',
+          endedAt: '2026-02-10T08:45:00.000Z',
+          totalDurationMin: 45,
+          setLogs: Array.from({ length: 10 }, (_, index) => ({
+            exerciseId: `e-${index}`,
+            setIndex: index,
+            restSecUsed: 75,
+          })),
+        },
+      },
+    ]
+
+    render(<WorkoutDetailPanel {...props} />)
+
+    expect(screen.getByText(/est\. 310 kcal/)).toBeVisible()
+  })
 })

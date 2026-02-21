@@ -21,8 +21,26 @@ const VARIANT_CATALOG: Record<string, string[]> = {
   ex_seated_calf_raise: ['Seated Calf Raise', 'Leg Press Calf Raise', 'Standing Calf Raise'],
 }
 
+function normalizeVariant(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function getCatalogExerciseVariants(exerciseId: string): string[] {
+  return VARIANT_CATALOG[exerciseId] ?? []
+}
+
 export function getExerciseVariants(exerciseId: string, currentName: string): string[] {
-  const variants = VARIANT_CATALOG[exerciseId] ?? []
+  const variants = getCatalogExerciseVariants(exerciseId)
   const withCurrent = [currentName, ...variants]
   return [...new Set(withCurrent)]
+}
+
+export function isCustomExerciseVariant(exerciseId: string, exerciseName: string): boolean {
+  const normalizedName = normalizeVariant(exerciseName)
+  if (!normalizedName) {
+    return false
+  }
+
+  const knownVariants = getCatalogExerciseVariants(exerciseId)
+  return !knownVariants.some((variant) => normalizeVariant(variant) === normalizedName)
 }

@@ -33,8 +33,46 @@
   padding: 0.65rem;
   display: grid;
   gap: 0.45rem;
-  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(11rem, 2fr) minmax(11rem, 1.25fr) repeat(4, minmax(0, 1fr));
+  align-items: start;
   overflow: hidden;
+}
+
+.referenceCard {
+  border: 1px solid var(--ink-200);
+  border-radius: 10px;
+  padding: 0.35rem;
+  background: color-mix(in srgb, var(--surface-0) 80%, var(--surface-1));
+  display: grid;
+  gap: 0.35rem;
+}
+
+.referenceImage {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--ink-150);
+}
+
+.referenceHint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-600);
+}
+
+.uploadButton {
+  border: 1px dashed var(--ink-300);
+  border-radius: 999px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  justify-self: start;
+  cursor: pointer;
+  color: var(--ink-800);
+}
+
+.uploadButton input {
+  display: none;
 }
 
 .actions {
@@ -56,6 +94,12 @@
   border-color: transparent;
   background: var(--accent-600);
   color: #fff;
+}
+
+@media (max-width: 1080px) {
+  .exerciseRow {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 920px) {
