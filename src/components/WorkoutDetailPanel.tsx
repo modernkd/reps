@@ -1,10 +1,19 @@
 import { format, parseISO } from 'date-fns'
 
+import type { AppLanguage } from '@/lib/i18n'
+import {
+  getCopy,
+  getDateLocale,
+  localizeIntensity,
+  localizeSessionStatus,
+  localizeWorkoutTypeName,
+} from '@/lib/i18n'
 import type { PlanDay, ScheduledSession, Workout, WorkoutType } from '@/lib/types'
 
 import styles from './styles/WorkoutDetailPanel.module.css'
 
 type WorkoutDetailPanelProps = {
+  language: AppLanguage
   date: string
   workouts: Workout[]
   scheduledSessions: ScheduledSession[]
@@ -13,6 +22,8 @@ type WorkoutDetailPanelProps = {
   onCreate: (date: string) => void
   onPasteWorkout: (date: string) => void
   canPasteWorkout: boolean
+  canClearAfter: boolean
+  onClearAfter: (date: string) => void
   onEdit: (workout: Workout) => void
   onDelete: (workoutId: string) => void
   onCopyWorkout: (workout: Workout) => void
@@ -24,6 +35,7 @@ type WorkoutDetailPanelProps = {
 }
 
 export function WorkoutDetailPanel({
+  language,
   date,
   workouts,
   scheduledSessions,
@@ -32,6 +44,8 @@ export function WorkoutDetailPanel({
   onCreate,
   onPasteWorkout,
   canPasteWorkout,
+  canClearAfter,
+  onClearAfter,
   onEdit,
   onDelete,
   onCopyWorkout,
@@ -41,29 +55,39 @@ export function WorkoutDetailPanel({
   onPreviewSession,
   onResetSession,
 }: WorkoutDetailPanelProps) {
+  const copy = getCopy(language)
+  const dateLocale = getDateLocale(language)
   const typeById = new Map(workoutTypes.map((type) => [type.id, type]))
   const dayById = new Map(planDays.map((day) => [day.id, day]))
 
   return (
-    <section className={styles.panel} aria-label="Workout details for selected date">
+    <section className={styles.panel} aria-label={copy.details.sectionAria}>
       <header className={styles.header}>
-        <h3>{format(parseISO(date), 'EEE, MMM d')}</h3>
+        <h3>{format(parseISO(date), 'EEE, MMM d', { locale: dateLocale })}</h3>
         <div className={styles.headerActions}>
           {canPasteWorkout ? (
             <button type="button" className={styles.ghost} onClick={() => onPasteWorkout(date)}>
-              Paste here
+              {copy.details.pasteHere}
             </button>
           ) : null}
+          <button
+            type="button"
+            className={styles.ghost}
+            onClick={() => onClearAfter(date)}
+            disabled={!canClearAfter}
+          >
+            {copy.details.clearAfter}
+          </button>
           <button type="button" onClick={() => onCreate(date)}>
-            Add workout
+            {copy.details.addWorkout}
           </button>
         </div>
       </header>
 
       <div className={styles.section}>
-        <h4>Planned Sessions</h4>
+        <h4>{copy.details.plannedSessions}</h4>
         {scheduledSessions.length === 0 ? (
-          <p className={styles.empty}>No planned sessions.</p>
+          <p className={styles.empty}>{copy.details.noPlannedSessions}</p>
         ) : (
           <ul className={styles.list}>
             {scheduledSessions.map((session) => {
@@ -73,8 +97,10 @@ export function WorkoutDetailPanel({
               return (
                 <li key={session.id} className={styles.item}>
                   <div>
-                    <strong>{planDay?.label ?? 'Planned workout'}</strong>
-                    <p>Status: {session.status.replace('_', ' ')}</p>
+                    <strong>{planDay?.label ?? copy.details.fallbackPlannedWorkout}</strong>
+                    <p>
+                      {copy.details.status}: {localizeSessionStatus(session.status, language)}
+                    </p>
                   </div>
                   {!isDone ? (
                     <div className={styles.actions}>
@@ -83,28 +109,30 @@ export function WorkoutDetailPanel({
                         className={styles.ghost}
                         onClick={() => onPreviewSession(session.id)}
                       >
-                        Preview / edit
+                        {copy.details.previewEdit}
                       </button>
                       <button type="button" onClick={() => onStartWorkout(session.id)}>
-                        {session.status === 'in_progress' ? 'Resume' : 'Start'}
+                        {session.status === 'in_progress'
+                          ? copy.details.resume
+                          : copy.details.start}
                       </button>
                       <button
                         type="button"
                         className={styles.ghost}
                         onClick={() => onSkipSession(session.id)}
                       >
-                        Skip
+                        {copy.details.skip}
                       </button>
                     </div>
                   ) : (
                     <div className={styles.actions}>
-                      <span className={styles.badge}>Completed</span>
+                      <span className={styles.badge}>{copy.details.completed}</span>
                       <button
                         type="button"
                         className={styles.ghost}
                         onClick={() => onResetSession(session.id)}
                       >
-                        Reset session
+                        {copy.details.resetSession}
                       </button>
                     </div>
                   )}
@@ -116,9 +144,9 @@ export function WorkoutDetailPanel({
       </div>
 
       <div className={styles.section}>
-        <h4>Completed Workouts</h4>
+        <h4>{copy.details.completedWorkouts}</h4>
         {workouts.length === 0 ? (
-          <p className={styles.empty}>No workouts logged for this day.</p>
+          <p className={styles.empty}>{copy.details.noCompletedWorkouts}</p>
         ) : (
           <ul className={styles.list}>
             {workouts.map((workout) => {
@@ -139,31 +167,38 @@ export function WorkoutDetailPanel({
               return (
                 <li key={workout.id} className={styles.item}>
                   <div>
-                    <strong>{type?.name ?? workout.type}</strong>
+                    <strong>
+                      {type ? localizeWorkoutTypeName(type, language) : workout.type}
+                    </strong>
                     <p>
                       {workout.durationMin} min
+                      {workout.targetWeightKg
+                        ? ` · ${copy.details.targetWeightLabel} ${workout.targetWeightKg} kg`
+                        : ''}
                       {workout.distanceKm ? ` · ${workout.distanceKm} km` : ''}
-                      {avgWeight ? ` · ${avgWeight} kg avg/set` : ''}
-                      {workout.intensity ? ` · ${workout.intensity}` : ''}
+                      {avgWeight ? ` · ${avgWeight} ${copy.details.avgPerSet}` : ''}
+                      {workout.intensity
+                        ? ` · ${localizeIntensity(workout.intensity, language)}`
+                        : ''}
                     </p>
                     {workout.notes ? <p className={styles.notes}>{workout.notes}</p> : null}
                   </div>
                   <div className={styles.actions}>
                     <button type="button" onClick={() => onCopyWorkout(workout)}>
-                      Copy
+                      {copy.details.copy}
                     </button>
                     <button type="button" onClick={() => onCopyToNextWeek(workout)}>
-                      +1 week
+                      {copy.details.copyToNextWeek}
                     </button>
                     <button type="button" onClick={() => onEdit(workout)}>
-                      Edit
+                      {copy.details.edit}
                     </button>
                     <button
                       type="button"
                       className={styles.ghost}
                       onClick={() => onDelete(workout.id)}
                     >
-                      Delete
+                      {copy.details.delete}
                     </button>
                   </div>
                 </li>

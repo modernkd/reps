@@ -2,6 +2,8 @@ import { differenceInSeconds, formatDistanceStrict, parseISO } from 'date-fns'
 import { useEffect, useMemo, useState } from 'react'
 
 import { nowIso } from '@/lib/date'
+import type { AppLanguage } from '@/lib/i18n'
+import { getCopy, getDateLocale } from '@/lib/i18n'
 import { getExerciseVariants } from '@/lib/variants'
 import type {
   ActiveSessionDraft,
@@ -15,6 +17,7 @@ import type {
 import styles from './styles/GuidedWorkoutView.module.css'
 
 type GuidedWorkoutViewProps = {
+  language: AppLanguage
   session: ScheduledSession
   planDay: PlanDay | undefined
   exercises: ExerciseTemplate[]
@@ -58,6 +61,7 @@ function nextSetPosition(
 }
 
 export function GuidedWorkoutView({
+  language,
   session,
   planDay,
   exercises,
@@ -67,6 +71,8 @@ export function GuidedWorkoutView({
   onAbort,
   onSwapExerciseVariant,
 }: GuidedWorkoutViewProps) {
+  const copy = getCopy(language)
+  const dateLocale = getDateLocale(language)
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
     draft.currentExerciseIndex,
   )
@@ -110,11 +116,11 @@ export function GuidedWorkoutView({
 
   const progressText = useMemo(() => {
     if (completedSets === 0) {
-      return 'Start your first set.'
+      return copy.guided.startFirstSet
     }
 
-    return `${completedSets}/${totalSetsTarget} sets logged`
-  }, [completedSets, totalSetsTarget])
+    return copy.guided.setsLogged(completedSets, totalSetsTarget)
+  }, [completedSets, copy.guided, totalSetsTarget])
 
   const persist = async (next: {
     exerciseIndex: number
@@ -221,32 +227,30 @@ export function GuidedWorkoutView({
   }
 
   return (
-    <section className={styles.wrapper} aria-label="Guided workout mode">
+    <section className={styles.wrapper} aria-label={copy.guided.sectionAria}>
       <header className={styles.header}>
         <div>
-          <h2>{planDay?.label ?? 'Guided Workout'}</h2>
-          <p>
-            Session date {session.date} · {progressText}
-          </p>
+          <h2>{planDay?.label ?? copy.guided.fallbackTitle}</h2>
+          <p>{copy.guided.sessionDateLine(session.date, progressText)}</p>
         </div>
         <button type="button" className={styles.abort} onClick={onAbort}>
-          End session
+          {copy.guided.endSession}
         </button>
       </header>
 
       <article className={styles.card}>
-        <h3>{currentExercise?.name ?? 'All exercises complete'}</h3>
+        <h3>{currentExercise?.name ?? copy.guided.allExercisesComplete}</h3>
         <p>
-          Set {currentSetIndex + 1}
-          {currentExercise ? ` of ${currentExercise.sets}` : ''}
+          {copy.guided.set} {currentSetIndex + 1}
+          {currentExercise ? ` ${copy.guided.of} ${currentExercise.sets}` : ''}
           {currentExercise?.minReps || currentExercise?.maxReps
-            ? ` · target ${currentExercise.minReps ?? currentExercise.maxReps}-${currentExercise.maxReps ?? currentExercise.minReps} reps`
+            ? ` · ${copy.guided.target} ${currentExercise.minReps ?? currentExercise.maxReps}-${currentExercise.maxReps ?? currentExercise.minReps} ${copy.guided.reps}`
             : ''}
         </p>
 
         {currentExercise ? (
           <label className={styles.variantControl}>
-            Variant
+            {copy.guided.variant}
             <select
               value={currentExercise.name}
               onChange={(event) =>
@@ -275,11 +279,11 @@ export function GuidedWorkoutView({
           <button type="button" onClick={() => setReps((value) => value + 1)}>
             +
           </button>
-          <span>reps</span>
+          <span>{copy.guided.reps}</span>
         </div>
 
         <label className={styles.weightControl}>
-          Weight for this set (kg)
+          {copy.guided.weightForSet}
           <input
             type="number"
             min={0}
@@ -295,14 +299,17 @@ export function GuidedWorkoutView({
           onClick={handleCompleteSet}
           disabled={!currentExercise}
         >
-          Complete set and continue
+          {copy.guided.completeSet}
         </button>
       </article>
 
       <article className={styles.timerCard}>
-        <h3>Rest timer</h3>
+        <h3>{copy.guided.restTimer}</h3>
         <p className={styles.timerValue}>
-          {formatDistanceStrict(0, restSecLeft * 1000, { unit: 'second' })}
+          {formatDistanceStrict(0, restSecLeft * 1000, {
+            unit: 'second',
+            locale: dateLocale,
+          })}
         </p>
         <div className={styles.timerActions}>
           <button
@@ -310,22 +317,22 @@ export function GuidedWorkoutView({
             onClick={() => updateTimer(restSecLeft, !timerPaused)}
             disabled={restSecLeft <= 0}
           >
-            {timerPaused ? 'Resume' : 'Pause'}
+            {timerPaused ? copy.guided.resume : copy.guided.pause}
           </button>
           <button type="button" onClick={() => updateTimer(restSecLeft + 15, false)}>
             +15s
           </button>
           <button type="button" onClick={() => updateTimer(0, true)}>
-            Reset
+            {copy.guided.reset}
           </button>
         </div>
       </article>
 
       <label className={styles.notes}>
-        Session notes
+        {copy.guided.sessionNotes}
         <textarea
           rows={3}
-          placeholder="How did the session feel?"
+          placeholder={copy.guided.sessionNotesPlaceholder}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
         />
@@ -338,7 +345,7 @@ export function GuidedWorkoutView({
           onClick={handleFinish}
           disabled={setLogs.length === 0 || isSubmitting}
         >
-          {isSubmitting ? 'Saving...' : 'Finish workout'}
+          {isSubmitting ? copy.common.saving : copy.guided.finishWorkout}
         </button>
       </footer>
     </section>

@@ -1,7 +1,7 @@
 .wrapper {
   border: 1px solid var(--ink-250);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--surface-1) 65%, white);
+  background: color-mix(in srgb, var(--surface-1) 65%, var(--surface-0));
   box-shadow: var(--shadow-2);
   display: grid;
   gap: 0.9rem;

@@ -17,6 +17,8 @@ import {
 import { format, parseISO } from 'date-fns'
 import gsap from 'gsap'
 
+import type { AppLanguage } from '@/lib/i18n'
+import { getCopy, getDateLocale, localizeWorkoutTypeName } from '@/lib/i18n'
 import {
   getRunProgressSeries,
   getStrengthExerciseNames,
@@ -34,6 +36,7 @@ import { useReducedMotion } from '@/lib/useReducedMotion'
 import styles from './styles/GraphView.module.css'
 
 type GraphViewProps = {
+  language: AppLanguage
   series: WeeklyTrendSeries
   workouts: Workout[]
   workoutTypes: WorkoutType[]
@@ -54,12 +57,15 @@ const PERFORMANCE_HEIGHT = 220
 const MARGIN = { top: 18, right: 56, bottom: 34, left: 48 }
 
 export function GraphView({
+  language,
   series,
   workouts,
   workoutTypes,
   selectedTypeIds,
   onPointSelect,
 }: GraphViewProps) {
+  const copy = getCopy(language)
+  const dateLocale = getDateLocale(language)
   const reducedMotion = useReducedMotion()
   const axisBottomRef = useRef<SVGGElement | null>(null)
   const axisLeftRef = useRef<SVGGElement | null>(null)
@@ -219,17 +225,17 @@ export function GraphView({
 
   const performanceYLabel = isRunLike
     ? runMetric === 'pace'
-      ? 'Pace (min/km)'
-      : 'Speed (km/h)'
-    : 'Best set weight (kg)'
+      ? copy.graph.yPace
+      : copy.graph.ySpeed
+    : copy.graph.yStrength
 
   const performanceTitle = isRunLike
     ? runMetric === 'pace'
-      ? 'Run Pace Progress'
-      : 'Run Speed Progress'
+      ? copy.graph.runPaceProgress
+      : copy.graph.runSpeedProgress
     : selectedExercise
-      ? `${selectedExercise} Progress`
-      : 'Exercise Progress'
+      ? `${selectedExercise} ${copy.graph.exerciseProgressSuffix}`
+      : copy.graph.exerciseProgress
 
   const performanceDrawableHeight = PERFORMANCE_HEIGHT - MARGIN.top - MARGIN.bottom
   const performanceDateExtent = extent(
@@ -288,7 +294,7 @@ export function GraphView({
 
     const xAxis = axisBottom<Date>(xScale)
       .ticks(Math.min(8, points.length))
-      .tickFormat((value) => format(value, 'MMM d'))
+      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
 
     const leftAxis = axisLeft(yFrequency).ticks(6)
     const rightAxis = axisRight(yDuration).ticks(6)
@@ -296,7 +302,7 @@ export function GraphView({
     select(axisBottomRef.current).call(xAxis)
     select(axisLeftRef.current).call(leftAxis)
     select(axisRightRef.current).call(rightAxis)
-  }, [points.length, xScale, yDuration, yFrequency])
+  }, [dateLocale, points.length, xScale, yDuration, yFrequency])
 
   useEffect(() => {
     if (!weightAxisBottomRef.current || !weightAxisLeftRef.current) {
@@ -305,12 +311,12 @@ export function GraphView({
 
     const xAxis = axisBottom<Date>(xScale)
       .ticks(Math.min(8, points.length))
-      .tickFormat((value) => format(value, 'MMM d'))
+      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
     const yAxis = axisLeft(yWeight).ticks(4)
 
     select(weightAxisBottomRef.current).call(xAxis)
     select(weightAxisLeftRef.current).call(yAxis)
-  }, [points.length, xScale, yWeight])
+  }, [dateLocale, points.length, xScale, yWeight])
 
   useEffect(() => {
     if (!perfAxisBottomRef.current || !perfAxisLeftRef.current) {
@@ -319,12 +325,12 @@ export function GraphView({
 
     const xAxis = axisBottom<Date>(performanceXScale)
       .ticks(Math.min(8, Math.max(2, performancePoints.length)))
-      .tickFormat((value) => format(value, 'MMM d'))
+      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
     const yAxis = axisLeft(performanceYScale).ticks(5)
 
     select(perfAxisBottomRef.current).call(xAxis)
     select(perfAxisLeftRef.current).call(yAxis)
-  }, [performancePoints.length, performanceXScale, performanceYScale])
+  }, [dateLocale, performancePoints.length, performanceXScale, performanceYScale])
 
   useEffect(() => {
     if (!chartRef.current || reducedMotion) {
@@ -381,9 +387,9 @@ export function GraphView({
 
   if (points.length === 0) {
     return (
-      <section className={styles.empty} aria-label="Graph view empty state">
-        <h3>No workout data yet</h3>
-        <p>Log workouts to unlock weekly trend lines.</p>
+      <section className={styles.empty} aria-label={copy.graph.emptyAria}>
+        <h3>{copy.graph.noWorkoutData}</h3>
+        <p>{copy.graph.logToUnlock}</p>
       </section>
     )
   }
@@ -391,10 +397,8 @@ export function GraphView({
   return (
     <section className={styles.wrapper}>
       <header className={styles.header}>
-        <h3>Weekly Workout Trends</h3>
-        <p aria-live="polite">
-          Frequency and total duration per ISO week. Hover points for details.
-        </p>
+        <h3>{copy.graph.title}</h3>
+        <p aria-live="polite">{copy.graph.subtitle}</p>
       </header>
 
       <div className={styles.chartWrap} ref={chartRef}>
@@ -402,7 +406,7 @@ export function GraphView({
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className={styles.chart}
           role="img"
-          aria-label="Line chart showing workouts per week and duration per week"
+          aria-label={copy.graph.chartAria}
         >
           <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
             <g className={styles.gridLines}>
@@ -467,22 +471,24 @@ export function GraphView({
             role="status"
             aria-live="polite"
           >
-            <strong>{format(parseISO(tooltip.point.weekStart), 'MMM d')}</strong>
-            <span>{tooltip.point.workoutsPerWeek} workouts</span>
+            <strong>{format(parseISO(tooltip.point.weekStart), 'MMM d', { locale: dateLocale })}</strong>
+            <span>{copy.graph.tooltipWorkouts(tooltip.point.workoutsPerWeek)}</span>
             <span>{d3Format(',')(tooltip.point.totalDurationPerWeek)} min</span>
-            {tooltip.point.avgWeightKg ? <span>{tooltip.point.avgWeightKg} kg avg</span> : null}
+            {tooltip.point.avgWeightKg ? (
+              <span>{copy.graph.tooltipAvgWeight(tooltip.point.avgWeightKg)}</span>
+            ) : null}
           </div>
         ) : null}
       </div>
 
       {weightPoints.length > 0 ? (
         <div className={styles.weightWrap}>
-          <h4>Average Weight Progress (kg)</h4>
+          <h4>{copy.graph.avgWeightTitle}</h4>
           <svg
             viewBox={`0 0 ${WIDTH} ${WEIGHT_HEIGHT}`}
             className={styles.chart}
             role="img"
-            aria-label="Line chart showing average workout weight per week"
+            aria-label={copy.graph.avgWeightAria}
           >
             <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
               <g className={styles.gridLines}>
@@ -516,24 +522,22 @@ export function GraphView({
           </svg>
         </div>
       ) : (
-        <p className={styles.weightHint}>
-          Add weight values to sets to see weekly load progression.
-        </p>
+        <p className={styles.weightHint}>{copy.graph.avgWeightHint}</p>
       )}
 
       <div className={styles.performanceWrap}>
         <div className={styles.performanceHeader}>
-          <h4>Performance Over Time</h4>
+          <h4>{copy.graph.performanceTitle}</h4>
           <div className={styles.performanceControls}>
             <label>
-              Type
+              {copy.graph.type}
               <select
                 value={focusTypeId}
                 onChange={(event) => setFocusTypeId(event.target.value)}
               >
                 {typeOptions.map((type) => (
                   <option key={type.id} value={type.id}>
-                    {type.name}
+                    {localizeWorkoutTypeName(type, language)}
                   </option>
                 ))}
               </select>
@@ -541,20 +545,20 @@ export function GraphView({
 
             {isRunLike ? (
               <label>
-                Metric
+                {copy.graph.metric}
                 <select
                   value={runMetric}
                   onChange={(event) =>
                     setRunMetric(event.target.value as 'pace' | 'speed')
                   }
                 >
-                  <option value="pace">Pace (min/km)</option>
-                  <option value="speed">Speed (km/h)</option>
+                  <option value="pace">{copy.graph.pace}</option>
+                  <option value="speed">{copy.graph.speed}</option>
                 </select>
               </label>
             ) : (
               <label>
-                Exercise
+                {copy.graph.exercise}
                 <select
                   value={selectedExercise}
                   onChange={(event) => setSelectedExercise(event.target.value)}
@@ -575,7 +579,7 @@ export function GraphView({
             viewBox={`0 0 ${WIDTH} ${PERFORMANCE_HEIGHT}`}
             className={styles.chart}
             role="img"
-            aria-label={`${performanceTitle} chart`}
+            aria-label={`${performanceTitle} ${copy.graph.chartSuffix}`}
           >
             <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
               <g className={styles.gridLines}>
@@ -617,8 +621,8 @@ export function GraphView({
         ) : (
           <p className={styles.weightHint}>
             {isRunLike
-              ? 'Log run workouts with distance to track pace/speed progress.'
-              : 'No set weight data for this exercise yet.'}
+              ? copy.graph.noRunData
+              : copy.graph.noStrengthData}
           </p>
         )}
 

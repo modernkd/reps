@@ -1,17 +1,26 @@
 import { useMemo, useState } from 'react'
 
+import type { AppLanguage } from '@/lib/i18n'
+import { getCopy } from '@/lib/i18n'
 import { getExerciseVariants } from '@/lib/variants'
 import type { SessionPlan } from '@/lib/types'
 
 import styles from './styles/SessionPlanEditor.module.css'
 
 type SessionPlanEditorProps = {
+  language: AppLanguage
   plan: SessionPlan
   onSave: (nextPlan: SessionPlan) => Promise<void>
   onCancel: () => void
 }
 
-export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorProps) {
+export function SessionPlanEditor({
+  language,
+  plan,
+  onSave,
+  onCancel,
+}: SessionPlanEditorProps) {
+  const copy = getCopy(language)
   const [draft, setDraft] = useState<SessionPlan>(plan)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -43,7 +52,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
   return (
     <div className={styles.wrapper}>
       <label>
-        Workout title
+        {copy.sessionPlan.workoutTitle}
         <input
           value={draft.title}
           onChange={(event) =>
@@ -53,10 +62,10 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
       </label>
 
       <label>
-        Notes
+        {copy.sessionPlan.notes}
         <textarea
           rows={3}
-          placeholder="Optional notes before starting"
+          placeholder={copy.sessionPlan.notesPlaceholder}
           value={draft.notes ?? ''}
           onChange={(event) =>
             setDraft((current) => ({
@@ -74,7 +83,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
           return (
             <li key={`${exercise.id}_${index}`} className={styles.exerciseRow}>
               <label>
-                Exercise variant
+                {copy.sessionPlan.exerciseVariant}
                 <select
                   value={exercise.name}
                   onChange={(event) =>
@@ -95,7 +104,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
               </label>
 
               <label>
-                Sets
+                {copy.sessionPlan.sets}
                 <input
                   type="number"
                   min={1}
@@ -114,7 +123,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
               </label>
 
               <label>
-                Min reps
+                {copy.sessionPlan.minReps}
                 <input
                   type="number"
                   min={1}
@@ -138,7 +147,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
               </label>
 
               <label>
-                Max reps
+                {copy.sessionPlan.maxReps}
                 <input
                   type="number"
                   min={1}
@@ -162,7 +171,7 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
               </label>
 
               <label>
-                Rest (sec)
+                {copy.sessionPlan.restSec}
                 <input
                   type="number"
                   min={15}
@@ -191,10 +200,10 @@ export function SessionPlanEditor({ plan, onSave, onCancel }: SessionPlanEditorP
 
       <div className={styles.actions}>
         <button type="button" onClick={onCancel} className={styles.ghost}>
-          Cancel
+          {copy.common.cancel}
         </button>
         <button type="button" onClick={save} disabled={isSaving} className={styles.primary}>
-          {isSaving ? 'Saving...' : 'Save plan'}
+          {isSaving ? copy.common.saving : copy.sessionPlan.savePlan}
         </button>
       </div>
     </div>

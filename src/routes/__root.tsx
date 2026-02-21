@@ -4,6 +4,28 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
 
+const themeInitializationScript = `
+(function () {
+  var theme = 'dark';
+  try {
+    var storedTheme = window.localStorage.getItem('workout-tracker-theme');
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      theme = storedTheme;
+    }
+  } catch (_) {
+    // Ignore read errors.
+  }
+
+  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.style.colorScheme = theme;
+
+  var themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) {
+    themeMeta.setAttribute('content', theme === 'dark' ? '#0f161d' : '#13212f');
+  }
+})();
+`
+
 const serviceWorkerRegistrationScript = `
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
@@ -29,7 +51,7 @@ export const Route = createRootRoute({
       },
       {
         name: 'theme-color',
-        content: '#13212f',
+        content: '#0f161d',
       },
       {
         name: 'apple-mobile-web-app-capable',
@@ -50,8 +72,25 @@ export const Route = createRootRoute({
         href: '/manifest.json',
       },
       {
+        rel: 'icon',
+        href: '/favicon.ico',
+      },
+      {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '32x32',
+        href: '/favicon-32.png',
+      },
+      {
+        rel: 'icon',
+        type: 'image/png',
+        sizes: '16x16',
+        href: '/favicon-16.png',
+      },
+      {
         rel: 'apple-touch-icon',
-        href: '/logo192.png',
+        sizes: '180x180',
+        href: '/apple-touch-icon.png',
       },
     ],
   }),
@@ -60,11 +99,12 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
       <head>
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
         {children}
         <script dangerouslySetInnerHTML={{ __html: serviceWorkerRegistrationScript }} />
         <TanStackDevtools

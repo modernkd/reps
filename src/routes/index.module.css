@@ -1,5 +1,6 @@
 .page {
-  min-height: 100dvh;
+  min-height: 100vh;
+  min-height: 100svh;
   background:
     radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--accent-200) 34%, transparent), transparent 55%),
     radial-gradient(circle at 100% 20%, color-mix(in srgb, var(--accent-100) 55%, transparent), transparent 46%),
@@ -45,10 +46,10 @@
 }
 
 .error {
-  border: 1px solid color-mix(in srgb, #b42318 50%, var(--ink-250));
-  background: color-mix(in srgb, #b42318 12%, var(--surface-0));
+  border: 1px solid color-mix(in srgb, var(--danger-500) 50%, var(--ink-250));
+  background: color-mix(in srgb, var(--danger-500) 12%, var(--surface-0));
   border-radius: 12px;
-  color: #7a271a;
+  color: var(--danger-700);
   padding: 0.65rem 0.8rem;
 }
 
@@ -63,5 +64,18 @@
 @media (max-width: 980px) {
   .calendarLayout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .container {
+    padding: 0.9rem 0.75rem 1.75rem;
+    gap: 0.75rem;
+  }
+
+  .main,
+  .calendarLayout,
+  .fullWidth {
+    gap: 0.75rem;
   }
 }

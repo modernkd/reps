@@ -12,7 +12,7 @@ describe('FilterBar', () => {
   it('emits selected type when toggled', () => {
     const onChange = vi.fn()
 
-    render(<FilterBar selectedTypeIds={[]} types={types} onChange={onChange} />)
+    render(<FilterBar language="en" selectedTypeIds={[]} types={types} onChange={onChange} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Lift' }))
 
@@ -22,7 +22,14 @@ describe('FilterBar', () => {
   it('resets to all types when all become selected', () => {
     const onChange = vi.fn()
 
-    render(<FilterBar selectedTypeIds={['lift']} types={types} onChange={onChange} />)
+    render(
+      <FilterBar
+        language="en"
+        selectedTypeIds={['lift']}
+        types={types}
+        onChange={onChange}
+      />,
+    )
 
     fireEvent.click(screen.getByRole('button', { name: 'Run' }))
 

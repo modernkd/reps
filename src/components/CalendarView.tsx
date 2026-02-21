@@ -1,13 +1,14 @@
 import clsx from 'clsx'
 import { format, parseISO } from 'date-fns'
 
+import type { AppLanguage } from '@/lib/i18n'
+import { getCopy, getDateLocale } from '@/lib/i18n'
 import type { CalendarDayModel } from '@/lib/types'
 
 import styles from './styles/CalendarView.module.css'
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
 type CalendarViewProps = {
+  language: AppLanguage
   month: string
   model: CalendarDayModel[]
   selectedDate: string
@@ -16,12 +17,15 @@ type CalendarViewProps = {
 }
 
 export function CalendarView({
+  language,
   month,
   model,
   selectedDate,
   onDaySelect,
   onMonthChange,
 }: CalendarViewProps) {
+  const copy = getCopy(language)
+  const dateLocale = getDateLocale(language)
   const monthDate = parseISO(`${month}-01`)
 
   const indexByDate = new Map(model.map((day, index) => [day.date, index]))
@@ -54,19 +58,29 @@ export function CalendarView({
   }
 
   return (
-    <section className={styles.wrapper} aria-label="Workout calendar">
+    <section className={styles.wrapper} aria-label={copy.calendar.sectionAria}>
       <header className={styles.header}>
-        <button type="button" onClick={() => onMonthChange(-1)}>
-          Previous
+        <button
+          type="button"
+          className={styles.monthButton}
+          aria-label={copy.calendar.previous}
+          onClick={() => onMonthChange(-1)}
+        >
+          {copy.calendar.previous}
         </button>
-        <h2>{format(monthDate, 'MMMM yyyy')}</h2>
-        <button type="button" onClick={() => onMonthChange(1)}>
-          Next
+        <h2>{format(monthDate, 'MMMM yyyy', { locale: dateLocale })}</h2>
+        <button
+          type="button"
+          className={styles.monthButton}
+          aria-label={copy.calendar.next}
+          onClick={() => onMonthChange(1)}
+        >
+          {copy.calendar.next}
         </button>
       </header>
 
       <div className={styles.weekdays}>
-        {WEEKDAY_LABELS.map((day) => (
+        {copy.calendar.weekdayLabels.map((day) => (
           <span key={day}>{day}</span>
         ))}
       </div>
@@ -74,7 +88,7 @@ export function CalendarView({
       <div
         className={styles.grid}
         role="grid"
-        aria-label="Monthly workout calendar"
+        aria-label={copy.calendar.gridAria}
         tabIndex={0}
         onKeyDown={handleGridKeyDown}
       >
@@ -90,7 +104,7 @@ export function CalendarView({
               onClick={() => onDaySelect(day.date)}
               role="gridcell"
               aria-selected={isSelected}
-              aria-label={`${day.date}, ${count} workouts, ${plannedCount} planned sessions`}
+              aria-label={copy.calendar.dayAria(day.date, count, plannedCount)}
               className={clsx(
                 styles.day,
                 !day.inCurrentMonth && styles.outOfMonth,
@@ -98,10 +112,22 @@ export function CalendarView({
                 count > 0 && styles.hasWorkout,
               )}
             >
-              <span className={styles.dayNumber}>{format(parseISO(day.date), 'd')}</span>
+              <span className={styles.dayNumber}>
+                {format(parseISO(day.date), 'd', { locale: dateLocale })}
+              </span>
               <span className={styles.metrics}>
-                {count > 0 ? <em>{count} done</em> : null}
-                {plannedCount > 0 ? <em>{plannedCount} planned</em> : null}
+                {count > 0 ? (
+                  <em>
+                    <span className={styles.metricValue}>{count}</span>
+                    <span className={styles.metricLabel}>{copy.calendar.done}</span>
+                  </em>
+                ) : null}
+                {plannedCount > 0 ? (
+                  <em>
+                    <span className={styles.metricValue}>{plannedCount}</span>
+                    <span className={styles.metricLabel}>{copy.calendar.planned}</span>
+                  </em>
+                ) : null}
               </span>
             </button>
           )

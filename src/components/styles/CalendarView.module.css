@@ -3,12 +3,14 @@
   border-radius: 16px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
+  overflow: clip;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--ink-150);
 }
@@ -17,15 +19,22 @@
   margin: 0;
   font-size: 1.05rem;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
-.header button {
+.monthButton {
   border: 1px solid var(--ink-250);
   border-radius: 999px;
   background: var(--surface-0);
   padding: 0.4rem 0.75rem;
   font-size: 0.82rem;
+  line-height: 1.1;
   cursor: pointer;
+  touch-action: manipulation;
+}
+
+.monthButton:active {
+  transform: translateY(1px);
 }
 
 .weekdays {
@@ -58,36 +67,50 @@
   border: 1px solid var(--ink-150);
   border-radius: 12px;
   background: var(--surface-0);
-  min-height: 5.3rem;
+  min-height: clamp(3.85rem, 13vw, 5.3rem);
   padding: 0.4rem;
   text-align: left;
   display: grid;
   grid-template-rows: auto 1fr;
-  transition: transform 140ms ease, border-color 140ms ease;
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
   cursor: pointer;
-}
-
-.day:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent-500) 45%, var(--ink-200));
+  touch-action: manipulation;
+  contain: paint;
 }
 
 .dayNumber {
   font-size: 0.9rem;
   color: var(--ink-900);
+  font-variant-numeric: tabular-nums;
 }
 
 .metrics {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.16rem;
   align-self: end;
 }
 
 .metrics em {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
   font-style: normal;
   font-size: 0.68rem;
+  line-height: 1.15;
   color: var(--ink-600);
+  white-space: nowrap;
+}
+
+.metricValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--ink-800);
+}
+
+.metricLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .outOfMonth {
@@ -101,4 +124,102 @@
 
 .hasWorkout {
   background: color-mix(in srgb, var(--accent-300) 10%, var(--surface-0));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .day:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent-500) 45%, var(--ink-200));
+  }
+}
+
+@media (max-width: 760px) {
+  .header {
+    padding: 0.75rem 0.78rem;
+  }
+
+  .header h2 {
+    font-size: 0.98rem;
+  }
+
+  .weekdays {
+    padding: 0.45rem 0.36rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+  }
+
+  .grid {
+    gap: 0.32rem;
+    padding: 0.4rem;
+  }
+
+  .day {
+    border-radius: 10px;
+    padding: 0.34rem;
+  }
+
+  .dayNumber {
+    font-size: 0.82rem;
+  }
+
+  .metrics em {
+    font-size: 0.62rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .header {
+    gap: 0.5rem;
+    padding: 0.65rem;
+  }
+
+  .header h2 {
+    font-size: 0.93rem;
+  }
+
+  .monthButton {
+    padding: 0.34rem 0.52rem;
+    font-size: 0.72rem;
+  }
+
+  .weekdays {
+    padding: 0.4rem 0.25rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .grid {
+    gap: 0.25rem;
+    padding: 0.3rem;
+  }
+
+  .day {
+    border-radius: 9px;
+    min-height: 0;
+    aspect-ratio: 1 / 0.92;
+    padding: 0.26rem;
+  }
+
+  .metrics {
+    gap: 0.14rem;
+  }
+
+  .metrics em {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-200) 18%, var(--surface-0));
+    width: fit-content;
+    padding: 0.04rem 0.22rem;
+    font-size: 0.55rem;
+  }
+
+  .metricLabel {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day,
+  .monthButton {
+    transition: none;
+  }
 }

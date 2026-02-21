@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AppHeader } from '@/components/AppHeader'
+import { AppFooterControls } from '@/components/AppFooterControls'
 import { CalendarView } from '@/components/CalendarView'
 import { FilterBar } from '@/components/FilterBar'
 import { GraphView } from '@/components/GraphView'
@@ -19,6 +20,7 @@ import {
   addWorkout,
   beginGuidedSession,
   completeGuidedSession,
+  clearDataAfterDate,
   deleteWorkout,
   ensureDefaultWorkoutTypes,
   exerciseTemplatesCollection,
@@ -48,6 +50,7 @@ import {
 } from '@/lib/selectors'
 import { trackEvent } from '@/lib/telemetry'
 import { useReducedMotion } from '@/lib/useReducedMotion'
+import { getCopy, type AppLanguage } from '@/lib/i18n'
 import type { ActiveSessionDraft, SessionPlan, Workout } from '@/lib/types'
 
 import styles from './index.module.css'
@@ -59,6 +62,54 @@ const searchSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   session: z.string().optional(),
 })
+
+const themeStorageKey = 'workout-tracker-theme'
+const languageStorageKey = 'workout-tracker-language'
+const themeMetaLight = '#13212f'
+const themeMetaDark = '#0f161d'
+
+type ThemeMode = 'light' | 'dark'
+
+function getPreferredTheme(): ThemeMode {
+  try {
+    const storedTheme = window.localStorage.getItem(themeStorageKey)
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme
+    }
+  } catch {
+    // Keep default when storage is unavailable.
+  }
+
+  return 'dark'
+}
+
+function getPreferredLanguage(): AppLanguage {
+  if (typeof window === 'undefined') {
+    return 'en'
+  }
+
+  try {
+    const storedLanguage = window.localStorage.getItem(languageStorageKey)
+    if (storedLanguage === 'en' || storedLanguage === 'sv') {
+      return storedLanguage
+    }
+  } catch {
+    // Keep default when storage is unavailable.
+  }
+
+  return 'en'
+}
+
+function applyTheme(theme: ThemeMode) {
+  const root = document.documentElement
+  root.setAttribute('data-theme', theme)
+  root.style.colorScheme = theme
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]')
+  if (themeMeta) {
+    themeMeta.setAttribute('content', theme === 'dark' ? themeMetaDark : themeMetaLight)
+  }
+}
 
 export const Route = createFileRoute('/')({
   validateSearch: (search) => searchSchema.parse(search),
@@ -103,10 +154,15 @@ function WorkoutDashboard() {
   >(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [importingTemplate, setImportingTemplate] = useState(false)
+  const [language, setLanguage] = useState<AppLanguage>(() => getPreferredLanguage())
+  const copy = getCopy(language)
+  const [theme, setTheme] = useState<ThemeMode>('dark')
+  const [themeReady, setThemeReady] = useState(false)
   const [previewSessionId, setPreviewSessionId] = useState<string | null>(null)
   const [copiedWorkout, setCopiedWorkout] = useState<{
     type: string
     durationMin: number
+    targetWeightKg?: number
     distanceKm?: number
     intensity?: 'low' | 'medium' | 'high'
     notes?: string
@@ -129,6 +185,12 @@ function WorkoutDashboard() {
 
   const selectedDay =
     calendarModel.find((day) => day.date === selectedDate) ?? calendarModel[0]
+  const canClearAfter = useMemo(
+    () =>
+      workouts.some((workout) => workout.date > selectedDate) ||
+      sessions.some((session) => session.date > selectedDate),
+    [selectedDate, sessions, workouts],
+  )
 
   const weeklySeries = useMemo(
     () =>
@@ -170,9 +232,44 @@ function WorkoutDashboard() {
 
   useEffect(() => {
     ensureDefaultWorkoutTypes().catch(() => {
-      setErrorMessage('Failed to initialize workout types.')
+      setErrorMessage(copy.route.failedInitTypes)
     })
+  }, [copy.route.failedInitTypes])
+
+  useEffect(() => {
+    const bootTheme = document.documentElement.getAttribute('data-theme')
+    if (bootTheme === 'light' || bootTheme === 'dark') {
+      setTheme(bootTheme)
+    } else {
+      setTheme(getPreferredTheme())
+    }
+
+    setThemeReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!themeReady) {
+      return
+    }
+
+    applyTheme(theme)
+
+    try {
+      window.localStorage.setItem(themeStorageKey, theme)
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [theme, themeReady])
+
+  useEffect(() => {
+    document.documentElement.lang = language
+
+    try {
+      window.localStorage.setItem(languageStorageKey, language)
+    } catch {
+      // Ignore storage write failures.
+    }
+  }, [language])
 
   useEffect(() => {
     if (!activeTemplateId) {
@@ -185,9 +282,9 @@ function WorkoutDashboard() {
       from: range.from,
       to: range.to,
     }).catch(() => {
-      setErrorMessage('Failed to generate scheduled sessions.')
+      setErrorMessage(copy.route.failedGenerateSessions)
     })
-  }, [activeTemplateId, month])
+  }, [activeTemplateId, copy.route.failedGenerateSessions, month])
 
   useEffect(() => {
     if (!reducedMotion && viewRef.current) {
@@ -229,6 +326,10 @@ function WorkoutDashboard() {
     }
   }
 
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
+  }
+
   const handleMonthChange = (offset: number) => {
     const nextMonth = addMonthOffset(month, offset)
     setSearch((prev) => ({ ...prev, month: nextMonth }))
@@ -263,12 +364,12 @@ function WorkoutDashboard() {
       setSearch((prev) => ({ ...prev, date: value.date }))
     } catch (error) {
       trackEvent('workout_save_error', { message: (error as Error).message })
-      setErrorMessage('Unable to save workout. Please try again.')
+      setErrorMessage(copy.route.saveWorkoutError)
     }
   }
 
   const handleDelete = async (workoutId: string) => {
-    const confirmed = window.confirm('Delete this workout?')
+    const confirmed = window.confirm(copy.route.confirmDeleteWorkout)
     if (!confirmed) {
       return
     }
@@ -276,7 +377,40 @@ function WorkoutDashboard() {
     try {
       await deleteWorkout(workoutId)
     } catch {
-      setErrorMessage('Unable to delete workout.')
+      setErrorMessage(copy.route.deleteWorkoutError)
+    }
+  }
+
+  const handleClearAfter = async (date: string) => {
+    const confirmed = window.confirm(copy.route.confirmClearAfterDate(date))
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const { sessionsDeleted, workoutsDeleted } = await clearDataAfterDate(date)
+      const selectedSession = search.session
+        ? sessions.find((session) => session.id === search.session)
+        : undefined
+      const previewSession = previewSessionId
+        ? sessions.find((session) => session.id === previewSessionId)
+        : undefined
+
+      if (selectedSession && selectedSession.date > date) {
+        setSearch((prev) => ({ ...prev, session: undefined }))
+      }
+
+      if (previewSession && previewSession.date > date) {
+        setPreviewSessionId(null)
+      }
+
+      trackEvent('clear_after_selected_day', {
+        date,
+        sessionsDeleted,
+        workoutsDeleted,
+      })
+    } catch {
+      setErrorMessage(copy.route.clearAfterDateError)
     }
   }
 
@@ -284,6 +418,7 @@ function WorkoutDashboard() {
     setCopiedWorkout({
       type: workout.type,
       durationMin: workout.durationMin,
+      targetWeightKg: workout.targetWeightKg,
       distanceKm: workout.distanceKm,
       intensity: workout.intensity,
       notes: workout.notes,
@@ -301,13 +436,14 @@ function WorkoutDashboard() {
         date,
         type: copiedWorkout.type,
         durationMin: copiedWorkout.durationMin,
+        targetWeightKg: copiedWorkout.targetWeightKg,
         distanceKm: copiedWorkout.distanceKm,
         intensity: copiedWorkout.intensity,
         notes: copiedWorkout.notes,
       })
       setSearch((prev) => ({ ...prev, date }))
     } catch {
-      setErrorMessage('Unable to paste workout.')
+      setErrorMessage(copy.route.pasteWorkoutError)
     }
   }
 
@@ -319,6 +455,7 @@ function WorkoutDashboard() {
         date: nextWeekDate,
         type: workout.type,
         durationMin: workout.durationMin,
+        targetWeightKg: workout.targetWeightKg,
         distanceKm: workout.distanceKm,
         intensity: workout.intensity,
         notes: workout.notes,
@@ -326,7 +463,7 @@ function WorkoutDashboard() {
       setSearch((prev) => ({ ...prev, date: nextWeekDate }))
       trackEvent('workout_copied_to_next_week', { workoutId: workout.id })
     } catch {
-      setErrorMessage('Unable to copy workout to next week.')
+      setErrorMessage(copy.route.copyToNextWeekError)
     }
   }
 
@@ -346,7 +483,7 @@ function WorkoutDashboard() {
       }
       trackEvent('starter_template_imported')
     } catch {
-      setErrorMessage('Could not import starter template.')
+      setErrorMessage(copy.route.importTemplateError)
     } finally {
       setImportingTemplate(false)
     }
@@ -360,7 +497,7 @@ function WorkoutDashboard() {
       await beginGuidedSession(sessionId)
       setSearch((prev) => ({ ...prev, session: sessionId }))
     } catch {
-      setErrorMessage('Unable to start guided workout.')
+      setErrorMessage(copy.route.startGuidedError)
     }
   }
 
@@ -369,7 +506,7 @@ function WorkoutDashboard() {
       await getOrCreateSessionPlan(sessionId)
       setPreviewSessionId(sessionId)
     } catch {
-      setErrorMessage('Unable to open session plan editor.')
+      setErrorMessage(copy.route.openPlanEditorError)
     }
   }
 
@@ -385,7 +522,7 @@ function WorkoutDashboard() {
 
       const nextDate = addDaysIso(session.date, 1)
       const planDay = planDays.find((day) => day.id === session.planDayId)
-      const workoutLabel = planDay?.label ?? 'Workout'
+      const workoutLabel = planDay?.label ?? copy.route.fallbackWorkoutLabel
 
       void sendSkippedWorkoutNotification({
         sessionId,
@@ -395,7 +532,7 @@ function WorkoutDashboard() {
       })
 
       const shouldMoveToTomorrow = window.confirm(
-        `${workoutLabel} was skipped on ${session.date}. Move it to ${nextDate}?`,
+        copy.route.confirmMoveSkipped(workoutLabel, session.date, nextDate),
       )
 
       if (shouldMoveToTomorrow) {
@@ -407,18 +544,16 @@ function WorkoutDashboard() {
             session: prev.session === sessionId ? movedSessionId : prev.session,
           }))
         } catch {
-          setErrorMessage('Unable to move session to next day.')
+          setErrorMessage(copy.route.moveSessionError)
         }
       }
     } catch {
-      setErrorMessage('Unable to skip session.')
+      setErrorMessage(copy.route.skipSessionError)
     }
   }
 
   const handleResetSession = async (sessionId: string) => {
-    const confirmed = window.confirm(
-      'Reset this completed session? Linked workout data will be removed from totals.',
-    )
+    const confirmed = window.confirm(copy.route.confirmResetSession)
     if (!confirmed) {
       return
     }
@@ -426,7 +561,7 @@ function WorkoutDashboard() {
     try {
       await resetCompletedSession(sessionId)
     } catch {
-      setErrorMessage('Unable to reset session.')
+      setErrorMessage(copy.route.resetSessionError)
     }
   }
 
@@ -449,9 +584,7 @@ function WorkoutDashboard() {
       return
     }
 
-    const confirmed = window.confirm(
-      'End this guided session and mark it as skipped?',
-    )
+    const confirmed = window.confirm(copy.route.confirmAbortSession)
     if (!confirmed) {
       return
     }
@@ -504,6 +637,7 @@ function WorkoutDashboard() {
       <div className={styles.container}>
         <AppHeader
           view={view}
+          language={language}
           onViewChange={handleChangeView}
           onOpenCreateWorkout={() => handleOpenCreate(selectedDate)}
           onImportTemplate={handleImportTemplate}
@@ -511,18 +645,20 @@ function WorkoutDashboard() {
         />
 
         <FilterBar
+          language={language}
           selectedTypeIds={selectedTypeIds}
           types={workoutTypes}
           onChange={handleFilterChange}
         />
 
         {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
-        {showLoading ? <p className={styles.loading}>Loading your workouts...</p> : null}
+        {showLoading ? <p className={styles.loading}>{copy.route.loadingWorkouts}</p> : null}
 
         <div className={styles.main} ref={viewRef}>
           {view === 'calendar' ? (
             <div className={styles.calendarLayout}>
               <CalendarView
+                language={language}
                 month={month}
                 model={calendarModel}
                 selectedDate={selectedDate}
@@ -532,6 +668,7 @@ function WorkoutDashboard() {
 
               {selectedDay ? (
                 <WorkoutDetailPanel
+                  language={language}
                   date={selectedDay.date}
                   workouts={selectedDay.workouts}
                   scheduledSessions={selectedDay.sessions}
@@ -540,6 +677,8 @@ function WorkoutDashboard() {
                   onCreate={handleOpenCreate}
                   onPasteWorkout={handlePasteWorkout}
                   canPasteWorkout={copiedWorkout !== null}
+                  canClearAfter={canClearAfter}
+                  onClearAfter={handleClearAfter}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
                   onCopyWorkout={handleCopyWorkout}
@@ -550,12 +689,13 @@ function WorkoutDashboard() {
                   onResetSession={handleResetSession}
                 />
               ) : (
-                <section className={styles.emptyState}>Select a date.</section>
+                <section className={styles.emptyState}>{copy.route.selectDate}</section>
               )}
             </div>
           ) : (
             <div className={styles.fullWidth}>
               <GraphView
+                language={language}
                 series={weeklySeries}
                 workouts={workouts}
                 workoutTypes={workoutTypes}
@@ -572,6 +712,7 @@ function WorkoutDashboard() {
         {activeSession && activeDraft ? (
           <section className={styles.floatingCard}>
             <GuidedWorkoutView
+              language={language}
               session={activeSession}
               planDay={activePlanDay}
               exercises={activeExercises}
@@ -585,28 +726,36 @@ function WorkoutDashboard() {
         ) : null}
 
         {search.session && !activeDraft ? (
-          <section className={styles.error}>
-            Guided session is not ready. Try re-opening it from the calendar day panel.
-          </section>
+          <section className={styles.error}>{copy.route.guidedNotReady}</section>
         ) : null}
 
         {workouts.length === 0 && sessions.length === 0 ? (
           <section className={styles.emptyState}>
-            <p>
-              Start by importing the 4-day template or adding your first completed
-              workout.
-            </p>
+            <p>{copy.route.emptyStateIntro}</p>
           </section>
         ) : null}
+
+        <AppFooterControls
+          language={language}
+          theme={theme}
+          onLanguageChange={setLanguage}
+          onToggleTheme={handleToggleTheme}
+        />
       </div>
 
       <Modal
-        title={modalState?.mode === 'edit' ? 'Edit workout' : 'Add workout'}
+        title={
+          modalState?.mode === 'edit'
+            ? copy.route.editWorkoutTitle
+            : copy.route.addWorkoutTitle
+        }
         isOpen={modalState !== null}
         onClose={() => setModalState(null)}
+        closeLabel={copy.common.close}
       >
         {modalState ? (
           <WorkoutForm
+            language={language}
             initialValue={modalState.mode === 'edit' ? modalState.workout : undefined}
             defaultDate={modalState.mode === 'create' ? modalState.date : selectedDate}
             types={workoutTypes}
@@ -617,18 +766,20 @@ function WorkoutDashboard() {
       </Modal>
 
       <Modal
-        title="Preview / Edit Session Plan"
+        title={copy.route.previewPlanTitle}
         isOpen={previewSessionId !== null}
         onClose={() => setPreviewSessionId(null)}
+        closeLabel={copy.common.close}
       >
         {previewPlan ? (
           <SessionPlanEditor
+            language={language}
             plan={previewPlan}
             onSave={handleSaveSessionPlan}
             onCancel={() => setPreviewSessionId(null)}
           />
         ) : (
-          <p className={styles.loading}>Loading plan...</p>
+          <p className={styles.loading}>{copy.route.loadingPlan}</p>
         )}
       </Modal>
     </main>

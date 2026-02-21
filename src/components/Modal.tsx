@@ -7,10 +7,11 @@ type ModalProps = {
   title: string
   isOpen: boolean
   onClose: () => void
+  closeLabel?: string
   children: ReactNode
 }
 
-export function Modal({ title, isOpen, onClose, children }: ModalProps) {
+export function Modal({ title, isOpen, onClose, closeLabel = 'Close', children }: ModalProps) {
   useEffect(() => {
     if (!isOpen) {
       return
@@ -42,7 +43,7 @@ export function Modal({ title, isOpen, onClose, children }: ModalProps) {
         <div className={styles.header}>
           <h2>{title}</h2>
           <button type="button" onClick={onClose} className={styles.closeButton}>
-            Close
+            {closeLabel}
           </button>
         </div>
         <div className={styles.content}>{children}</div>
