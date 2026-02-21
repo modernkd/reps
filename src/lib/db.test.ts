@@ -4,6 +4,7 @@ import {
   activeSessionDraftsCollection,
   addWorkout,
   clearDataAfterDate,
+  createPlanTemplate,
   exerciseTemplatesCollection,
   generateScheduleForRange,
   importStarterTemplate,
@@ -91,6 +92,61 @@ describe('template and scheduling', () => {
     expect(insertedAgain).toBe(0)
   })
 
+  it('creates a custom template and schedules only from the selected start date', async () => {
+    const template = await createPlanTemplate({
+      name: 'Custom split',
+      startDate: '2026-02-10',
+      days: [
+        {
+          weekday: 2,
+          label: 'Tuesday session',
+          exercises: [
+            {
+              name: 'Back Squat',
+              sets: 5,
+              minReps: 3,
+              maxReps: 5,
+              restSecDefault: 150,
+            },
+          ],
+        },
+      ],
+    })
+
+    await Promise.all([
+      planTemplatesCollection.preload(),
+      planDaysCollection.preload(),
+      exerciseTemplatesCollection.preload(),
+    ])
+
+    const templateDays = planDaysCollection.toArray.filter(
+      (day) => day.templateId === template.id,
+    )
+    const templateDayIds = new Set(templateDays.map((day) => day.id))
+
+    expect(planTemplatesCollection.get(template.id)?.startDate).toBe('2026-02-10')
+    expect(templateDays).toHaveLength(1)
+    expect(
+      exerciseTemplatesCollection.toArray.filter((exercise) =>
+        templateDayIds.has(exercise.planDayId),
+      ),
+    ).toHaveLength(1)
+
+    const inserted = await generateScheduleForRange({
+      templateId: template.id,
+      from: '2026-02-02',
+      to: '2026-02-16',
+    })
+
+    await scheduledSessionsCollection.preload()
+    const sessionDates = scheduledSessionsCollection.toArray
+      .filter((session) => session.templateId === template.id)
+      .map((session) => session.date)
+
+    expect(inserted).toBe(1)
+    expect(sessionDates).toEqual(['2026-02-10'])
+  })
+
   it('moves a skipped session to the next day and keeps the edited plan', async () => {
     await importStarterTemplate()
     await planTemplatesCollection.preload()
@@ -103,7 +159,9 @@ describe('template and scheduling', () => {
     })
 
     await scheduledSessionsCollection.preload()
-    const originalSession = scheduledSessionsCollection.toArray[0]
+    const originalSession = scheduledSessionsCollection.toArray.find(
+      (session) => session.date === '2026-02-02',
+    )
     expect(originalSession).toBeDefined()
 
     await sessionPlansCollection.preload()
@@ -268,5 +326,39 @@ describe('clearDataAfterDate', () => {
 
     expect(activeSessionDraftsCollection.has('session-future-planned')).toBe(false)
     expect(sessionPlansCollection.has('session-future-planned')).toBe(false)
+  })
+
+  it('prevents schedule regeneration after the cleared date', async () => {
+    await importStarterTemplate()
+    await planTemplatesCollection.preload()
+    const template = planTemplatesCollection.toArray[0]
+
+    expect(template).toBeDefined()
+
+    await generateScheduleForRange({
+      templateId: template!.id,
+      from: '2026-02-01',
+      to: '2026-03-31',
+    })
+
+    await clearDataAfterDate('2026-02-10')
+
+    const insertedAfterClear = await generateScheduleForRange({
+      templateId: template!.id,
+      from: '2026-02-11',
+      to: '2026-04-30',
+    })
+
+    await Promise.all([
+      planTemplatesCollection.preload(),
+      scheduledSessionsCollection.preload(),
+    ])
+
+    const updatedTemplate = planTemplatesCollection.get(template!.id)
+    expect(updatedTemplate?.endDate).toBe('2026-02-10')
+    expect(insertedAfterClear).toBe(0)
+    expect(
+      scheduledSessionsCollection.toArray.some((session) => session.date > '2026-02-10'),
+    ).toBe(false)
   })
 })

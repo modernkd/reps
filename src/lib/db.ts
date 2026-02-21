@@ -7,7 +7,7 @@ import {
 import { addDays, isAfter, parseISO } from 'date-fns'
 
 import { createId } from './ids'
-import { nowIso } from './date'
+import { nowIso, toDateIso } from './date'
 import {
   activeSessionDraftSchema,
   exerciseTemplateSchema,
@@ -30,6 +30,7 @@ import {
   workoutTypeSchema,
 } from './types'
 import { createStarterTemplateBundle, STARTER_TEMPLATE_ID } from './templates'
+import { inferWorkoutTypeFromPlanDay } from './workoutType'
 
 const DEFAULT_WORKOUT_TYPES = [
   { id: 'lift', name: 'Lift', color: '#ef476f' },
@@ -281,6 +282,18 @@ export async function clearDataAfterDate(
     await persist(scheduledSessionsCollection.delete(sessionIds))
   }
 
+  const templatesToClamp = planTemplatesCollection.toArray.filter(
+    (template) => template.endDate === undefined || template.endDate > date,
+  )
+  for (const template of templatesToClamp) {
+    await persist(
+      planTemplatesCollection.update(template.id, (draft) => {
+        draft.endDate = date
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
   return {
     workoutsDeleted: workoutsAfterDate.length,
     sessionsDeleted: sessionsAfterDate.length,
@@ -444,7 +457,9 @@ export async function generateScheduleForRange(input: {
   }
 
   const scheduleFrom = template.startDate > from ? template.startDate : from
-  if (scheduleFrom > to) {
+  const scheduleTo =
+    template.endDate && template.endDate < to ? template.endDate : to
+  if (scheduleFrom > scheduleTo) {
     return 0
   }
 
@@ -458,10 +473,10 @@ export async function generateScheduleForRange(input: {
 
   const recordsToInsert: ScheduledSession[] = []
   let cursor = parseISO(scheduleFrom)
-  const end = parseISO(to)
+  const end = parseISO(scheduleTo)
 
   while (!isAfter(cursor, end)) {
-    const isoDate = cursor.toISOString().slice(0, 10)
+    const isoDate = toDateIso(cursor)
     const isoWeekday = ((cursor.getDay() + 6) % 7) + 1
 
     for (const day of templateDays) {
@@ -553,27 +568,6 @@ export async function saveGuidedSessionDraft(
       draft.updatedAt = nowIso()
     }),
   )
-}
-
-function inferWorkoutTypeFromPlanDay(day: PlanDay | undefined): string {
-  if (!day) {
-    return 'lift'
-  }
-
-  const label = day.label.toLowerCase()
-  if (label.includes('yoga')) {
-    return 'yoga'
-  }
-  if (label.includes('run')) {
-    return 'run'
-  }
-  if (label.includes('cardio')) {
-    return 'cardio'
-  }
-  if (label.includes('mobility')) {
-    return 'mobility'
-  }
-  return 'lift'
 }
 
 function estimateDurationFromSetLogs(

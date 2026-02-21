@@ -12,6 +12,7 @@ export function createStarterTemplateBundle(timestampIso: string): StarterTempla
   const template: PlanTemplate = {
     id: STARTER_TEMPLATE_ID,
     name: '4-Day Upper/Lower Split',
+    startDate: '1970-01-01',
     locale: 'en',
     isStarter: true,
     createdAt: timestampIso,
