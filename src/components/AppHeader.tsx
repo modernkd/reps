@@ -8,19 +8,27 @@ import styles from './styles/AppHeader.module.css'
 type AppHeaderProps = {
   view: 'calendar' | 'graph'
   language: AppLanguage
+  templates: Array<{ id: string; name: string }>
+  activeTemplateId?: string
   onViewChange: (view: 'calendar' | 'graph') => void
+  onTemplateChange: (templateId: string) => void
+  onOpenCreateTemplate: () => void
+  onOpenDuplicateTemplate: () => void
   onOpenCreateWorkout: () => void
-  onImportTemplate: () => Promise<void>
-  importingTemplate: boolean
 }
+
+const DUPLICATE_TEMPLATE_ACTION = '__duplicate_template__'
 
 export function AppHeader({
   view,
   language,
+  templates,
+  activeTemplateId,
   onViewChange,
+  onTemplateChange,
+  onOpenCreateTemplate,
+  onOpenDuplicateTemplate,
   onOpenCreateWorkout,
-  onImportTemplate,
-  importingTemplate,
 }: AppHeaderProps) {
   const copy = getCopy(language)
 
@@ -57,10 +65,40 @@ export function AppHeader({
           </button>
         </div>
 
-        <button type="button" className={styles.secondary} onClick={onImportTemplate}>
-          {importingTemplate
-            ? copy.appHeader.importingTemplate
-            : copy.appHeader.importTemplate}
+        <label className={styles.templatePicker}>
+          <span>{copy.appHeader.templateLabel}</span>
+          <select
+            aria-label={copy.appHeader.selectTemplate}
+            value={activeTemplateId ?? ''}
+            onChange={(event) => {
+              if (event.target.value === DUPLICATE_TEMPLATE_ACTION) {
+                onOpenDuplicateTemplate()
+                return
+              }
+
+              onTemplateChange(event.target.value)
+            }}
+          >
+            {templates.length === 0 ? (
+              <option value="">{copy.appHeader.selectTemplate}</option>
+            ) : null}
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {template.name}
+              </option>
+            ))}
+            <option value={DUPLICATE_TEMPLATE_ACTION} disabled={templates.length === 0}>
+              {copy.appHeader.duplicateTemplate}
+            </option>
+          </select>
+        </label>
+
+        <button
+          type="button"
+          className={styles.secondary}
+          onClick={onOpenCreateTemplate}
+        >
+          {copy.appHeader.addTemplateToCalendar}
         </button>
 
         <button type="button" className={styles.primary} onClick={onOpenCreateWorkout}>

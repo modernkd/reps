@@ -7,10 +7,13 @@ function renderHeader() {
   const props = {
     view: 'calendar' as const,
     language: 'en' as const,
+    templates: [{ id: 'template-1', name: 'Template 1' }],
+    activeTemplateId: 'template-1',
     onViewChange: vi.fn(),
+    onTemplateChange: vi.fn(),
+    onOpenCreateTemplate: vi.fn(),
+    onOpenDuplicateTemplate: vi.fn(),
     onOpenCreateWorkout: vi.fn(),
-    onImportTemplate: vi.fn().mockResolvedValue(undefined),
-    importingTemplate: false,
   }
 
   render(<AppHeader {...props} />)
@@ -26,13 +29,32 @@ describe('AppHeader', () => {
     expect(props.onViewChange).toHaveBeenCalledWith('graph')
   })
 
-  it('requests workout import when template button is clicked', () => {
+  it('opens create-template flow from template dropdown action', () => {
     const props = renderHeader()
 
-    const button = screen.getByRole('button', { name: 'Import 4-day template' })
-    fireEvent.click(button)
+    fireEvent.click(screen.getByRole('button', { name: 'Add template to calendar' }))
 
-    expect(props.onImportTemplate).toHaveBeenCalledTimes(1)
+    expect(props.onOpenCreateTemplate).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens duplicate-template flow from template dropdown action', () => {
+    const props = renderHeader()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select template' }), {
+      target: { value: '__duplicate_template__' },
+    })
+
+    expect(props.onOpenDuplicateTemplate).toHaveBeenCalledTimes(1)
+  })
+
+  it('requests template change when selecting a template id', () => {
+    const props = renderHeader()
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Select template' }), {
+      target: { value: 'template-1' },
+    })
+
+    expect(props.onTemplateChange).toHaveBeenCalledWith('template-1')
   })
 
   it('requests add workout when primary action is clicked', () => {

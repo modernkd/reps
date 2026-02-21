@@ -5,14 +5,15 @@ import gsap from 'gsap'
 import { z } from 'zod'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { AppHeader } from '@/components/AppHeader'
 import { AppFooterControls } from '@/components/AppFooterControls'
+import { AppHeader } from '@/components/AppHeader'
 import { CalendarView } from '@/components/CalendarView'
 import { FilterBar } from '@/components/FilterBar'
 import { GraphView } from '@/components/GraphView'
 import { GuidedWorkoutView } from '@/components/GuidedWorkoutView'
 import { Modal } from '@/components/Modal'
 import { SessionPlanEditor } from '@/components/SessionPlanEditor'
+import { TemplateEditor, createDefaultTemplateDays } from '@/components/TemplateEditor'
 import { WorkoutDetailPanel } from '@/components/WorkoutDetailPanel'
 import { WorkoutForm, type WorkoutFormValue } from '@/components/WorkoutForm'
 import {
@@ -21,6 +22,7 @@ import {
   beginGuidedSession,
   completeGuidedSession,
   clearDataAfterDate,
+  createPlanTemplate,
   deleteWorkout,
   ensureDefaultWorkoutTypes,
   exerciseTemplatesCollection,
@@ -41,6 +43,7 @@ import {
   workoutsCollection,
 } from '@/lib/db'
 import { addDaysIso, addMonthOffset, todayIso, toDateIso } from '@/lib/date'
+import { STARTER_TEMPLATE_ID } from '@/lib/templates'
 import { sendSkippedWorkoutNotification } from '@/lib/notifications'
 import {
   getCalendarMonthModel,
@@ -61,6 +64,7 @@ const searchSchema = z.object({
   types: z.string().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   session: z.string().optional(),
+  template: z.string().optional(),
 })
 
 const themeStorageKey = 'workout-tracker-theme'
@@ -146,14 +150,25 @@ function WorkoutDashboard() {
     () => (search.types ? search.types.split(',').filter(Boolean) : []),
     [search.types],
   )
+  const setSearch = (updater: (prev: typeof search) => typeof search) => {
+    navigate({ search: updater })
+  }
 
   const [modalState, setModalState] = useState<
     | { mode: 'create'; date: string }
     | { mode: 'edit'; workout: Workout }
     | null
   >(null)
+  const [templateModalState, setTemplateModalState] = useState<
+    | {
+        sourceTemplateId?: string
+        startDate: string
+        allowSourceSelection: boolean
+        duplicateIntent: boolean
+      }
+    | null
+  >(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [importingTemplate, setImportingTemplate] = useState(false)
   const [language, setLanguage] = useState<AppLanguage>(() => getPreferredLanguage())
   const copy = getCopy(language)
   const [theme, setTheme] = useState<ThemeMode>('dark')
@@ -170,17 +185,38 @@ function WorkoutDashboard() {
 
   const viewRef = useRef<HTMLDivElement | null>(null)
 
-  const activeTemplateId = templates[0]?.id
+  const activeTemplateId = useMemo(() => {
+    if (templates.length === 0) {
+      return undefined
+    }
+
+    if (search.template && templates.some((template) => template.id === search.template)) {
+      return search.template
+    }
+
+    return (
+      templates.find((template) => template.id === STARTER_TEMPLATE_ID)?.id ??
+      templates[0]?.id
+    )
+  }, [search.template, templates])
+  const activeTemplate = templates.find((template) => template.id === activeTemplateId)
+  const visibleSessions = useMemo(
+    () =>
+      activeTemplateId
+        ? sessions.filter((session) => session.templateId === activeTemplateId)
+        : sessions,
+    [activeTemplateId, sessions],
+  )
 
   const calendarModel = useMemo(
     () =>
       getCalendarMonthModel({
         month,
         workouts,
-        sessions,
+        sessions: visibleSessions,
         typeIds: selectedTypeIds,
       }),
-    [month, workouts, sessions, selectedTypeIds],
+    [month, workouts, visibleSessions, selectedTypeIds],
   )
 
   const selectedDay =
@@ -188,8 +224,8 @@ function WorkoutDashboard() {
   const canClearAfter = useMemo(
     () =>
       workouts.some((workout) => workout.date > selectedDate) ||
-      sessions.some((session) => session.date > selectedDate),
-    [selectedDate, sessions, workouts],
+      visibleSessions.some((session) => session.date > selectedDate),
+    [selectedDate, visibleSessions, workouts],
   )
 
   const weeklySeries = useMemo(
@@ -235,6 +271,12 @@ function WorkoutDashboard() {
       setErrorMessage(copy.route.failedInitTypes)
     })
   }, [copy.route.failedInitTypes])
+
+  useEffect(() => {
+    importStarterTemplate().catch(() => {
+      setErrorMessage(copy.route.importTemplateError)
+    })
+  }, [copy.route.importTemplateError])
 
   useEffect(() => {
     const bootTheme = document.documentElement.getAttribute('data-theme')
@@ -314,9 +356,41 @@ function WorkoutDashboard() {
     }
   }, [navigate, search.date, selectedDate])
 
-  const setSearch = (updater: (prev: typeof search) => typeof search) => {
-    navigate({ search: updater })
-  }
+  useEffect(() => {
+    if (!activeTemplateId || search.template === activeTemplateId) {
+      return
+    }
+
+    navigate({
+      replace: true,
+      search: (prev) => ({ ...prev, template: activeTemplateId }),
+    })
+  }, [activeTemplateId, navigate, search.template])
+
+  useEffect(() => {
+    if (!activeTemplate || selectedDate >= activeTemplate.startDate) {
+      return
+    }
+
+    setSearch((prev) => ({
+      ...prev,
+      date: activeTemplate.startDate,
+      month: activeTemplate.startDate.slice(0, 7),
+    }))
+  }, [activeTemplate, selectedDate])
+
+  useEffect(() => {
+    if (!search.session || !activeTemplateId) {
+      return
+    }
+
+    const selectedSession = sessions.find((session) => session.id === search.session)
+    if (!selectedSession || selectedSession.templateId === activeTemplateId) {
+      return
+    }
+
+    setSearch((prev) => ({ ...prev, session: undefined }))
+  }, [activeTemplateId, search.session, sessions])
 
   const handleChangeView = (nextView: 'calendar' | 'graph') => {
     setSearch((prev) => ({ ...prev, view: nextView }))
@@ -339,6 +413,48 @@ function WorkoutDashboard() {
     const encoded = nextTypeIds.length > 0 ? nextTypeIds.sort().join(',') : undefined
     setSearch((prev) => ({ ...prev, types: encoded }))
     trackEvent('filter_used', { typeIds: nextTypeIds })
+  }
+
+  const getTemplateDaysForEditor = (templateId: string) => {
+    const templateDays = planDays
+      .filter((day) => day.templateId === templateId)
+      .sort((a, b) => a.weekday - b.weekday)
+
+    return templateDays.map((day) => ({
+      weekday: day.weekday,
+      label: day.label,
+      exercises: exercises
+        .filter((exercise) => exercise.planDayId === day.id)
+        .map((exercise) => ({
+          name: exercise.name,
+          sets: exercise.sets,
+          minReps: exercise.minReps,
+          maxReps: exercise.maxReps,
+          restSecDefault: exercise.restSecDefault,
+        })),
+    }))
+  }
+
+  const handleTemplateChange = (templateId: string) => {
+    setSearch((prev) => ({ ...prev, template: templateId, session: undefined }))
+  }
+
+  const handleOpenCreateTemplate = () => {
+    setTemplateModalState({
+      sourceTemplateId: activeTemplateId,
+      startDate: selectedDate,
+      allowSourceSelection: false,
+      duplicateIntent: false,
+    })
+  }
+
+  const handleOpenDuplicateTemplate = () => {
+    setTemplateModalState({
+      sourceTemplateId: activeTemplateId,
+      startDate: selectedDate,
+      allowSourceSelection: true,
+      duplicateIntent: true,
+    })
   }
 
   const handleOpenCreate = (date = selectedDate) => {
@@ -467,25 +583,63 @@ function WorkoutDashboard() {
     }
   }
 
-  const handleImportTemplate = async () => {
-    setImportingTemplate(true)
+  const handleSaveTemplate = async (value: {
+    name: string
+    startDate: string
+    days: Array<{
+      weekday: number
+      label: string
+      exercises: Array<{
+        name: string
+        sets: number
+        minReps?: number
+        maxReps?: number
+        restSecDefault?: number
+      }>
+    }>
+  }) => {
+    if (!templateModalState) {
+      return
+    }
+
     setErrorMessage(null)
 
     try {
-      await importStarterTemplate()
-      if (templates[0]?.id) {
-        const range = monthRange(month)
-        await generateScheduleForRange({
-          templateId: templates[0].id,
-          from: range.from,
-          to: range.to,
-        })
-      }
-      trackEvent('starter_template_imported')
+      const template = await createPlanTemplate({
+        name: value.name,
+        startDate: value.startDate,
+        locale: language,
+        days: value.days,
+      })
+
+      const range = monthRange(month)
+      await generateScheduleForRange({
+        templateId: template.id,
+        from: range.from,
+        to: range.to,
+      })
+
+      setTemplateModalState(null)
+      setSearch((prev) => ({
+        ...prev,
+        template: template.id,
+        date: value.startDate,
+        month: value.startDate.slice(0, 7),
+        session: undefined,
+      }))
+
+      trackEvent(
+        templateModalState.duplicateIntent ? 'template_duplicated' : 'template_created',
+        {
+        templateId: template.id,
+        },
+      )
     } catch {
-      setErrorMessage(copy.route.importTemplateError)
-    } finally {
-      setImportingTemplate(false)
+      setErrorMessage(
+        templateModalState.duplicateIntent
+          ? copy.route.duplicateTemplateError
+          : copy.route.createTemplateError,
+      )
     }
   }
 
@@ -624,9 +778,22 @@ function WorkoutDashboard() {
     }))
   }
 
+  const templateSource = templateModalState?.sourceTemplateId
+    ? templates.find((template) => template.id === templateModalState.sourceTemplateId)
+    : undefined
+
+  const templateEditorInitialName =
+    templateSource ? `${templateSource.name} copy` : ''
+  const templateEditorInitialStartDate = templateModalState?.startDate ?? selectedDate
+  const templateEditorInitialDays =
+    templateSource
+      ? getTemplateDaysForEditor(templateSource.id)
+      : createDefaultTemplateDays()
+
   const showLoading =
     workoutsQuery.isLoading ||
     typesQuery.isLoading ||
+    templatesQuery.isLoading ||
     sessionsQuery.isLoading ||
     planDaysQuery.isLoading ||
     exerciseQuery.isLoading ||
@@ -638,10 +805,16 @@ function WorkoutDashboard() {
         <AppHeader
           view={view}
           language={language}
+          templates={templates.map((template) => ({
+            id: template.id,
+            name: template.name,
+          }))}
+          activeTemplateId={activeTemplateId}
           onViewChange={handleChangeView}
+          onTemplateChange={handleTemplateChange}
+          onOpenCreateTemplate={handleOpenCreateTemplate}
+          onOpenDuplicateTemplate={handleOpenDuplicateTemplate}
           onOpenCreateWorkout={() => handleOpenCreate(selectedDate)}
-          onImportTemplate={handleImportTemplate}
-          importingTemplate={importingTemplate}
         />
 
         <FilterBar
@@ -729,19 +902,19 @@ function WorkoutDashboard() {
           <section className={styles.error}>{copy.route.guidedNotReady}</section>
         ) : null}
 
-        {workouts.length === 0 && sessions.length === 0 ? (
+        {workouts.length === 0 && visibleSessions.length === 0 ? (
           <section className={styles.emptyState}>
             <p>{copy.route.emptyStateIntro}</p>
           </section>
         ) : null}
-
-        <AppFooterControls
-          language={language}
-          theme={theme}
-          onLanguageChange={setLanguage}
-          onToggleTheme={handleToggleTheme}
-        />
       </div>
+
+      <AppFooterControls
+        language={language}
+        theme={theme}
+        onLanguageChange={setLanguage}
+        onToggleTheme={handleToggleTheme}
+      />
 
       <Modal
         title={
@@ -762,6 +935,53 @@ function WorkoutDashboard() {
             onSubmit={saveWorkout}
             onCancel={() => setModalState(null)}
           />
+        ) : null}
+      </Modal>
+
+      <Modal
+        title={copy.route.createTemplateTitle}
+        isOpen={templateModalState !== null}
+        onClose={() => setTemplateModalState(null)}
+        closeLabel={copy.common.close}
+      >
+        {templateModalState ? (
+          <>
+            {templateModalState.allowSourceSelection && templates.length > 0 ? (
+              <label>
+                {copy.templateForm.selectDuplicateSource}
+                <select
+                  value={templateModalState.sourceTemplateId ?? ''}
+                  onChange={(event) =>
+                    setTemplateModalState((current) =>
+                      current
+                        ? {
+                            ...current,
+                            sourceTemplateId: event.target.value || undefined,
+                          }
+                        : current,
+                    )
+                  }
+                >
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <TemplateEditor
+              key={templateModalState.sourceTemplateId ?? 'template_blank'}
+              language={language}
+              mode={templateModalState.duplicateIntent ? 'duplicate' : 'create'}
+              initialName={templateEditorInitialName}
+              initialStartDate={templateEditorInitialStartDate}
+              initialDays={templateEditorInitialDays}
+              onSubmit={handleSaveTemplate}
+              onCancel={() => setTemplateModalState(null)}
+            />
+          </>
         ) : null}
       </Modal>
 

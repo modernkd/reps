@@ -21,18 +21,52 @@
 }
 
 .controls {
+  --control-height: 2.35rem;
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
+}
+
+.controls > * {
+  flex-shrink: 0;
+}
+
+.templatePicker {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--ink-600);
+  justify-items: start;
+}
+
+.templatePicker span {
+  min-height: 1rem;
+  line-height: 1;
+}
+
+.templatePicker select {
+  border: 1px solid var(--ink-250);
+  border-radius: 999px;
+  padding: 0.42rem 0.75rem;
+  background: var(--surface-0);
+  color: var(--ink-900);
+  font-size: 0.84rem;
+  min-height: var(--control-height);
+  line-height: 1.15;
+  min-width: 12.5rem;
 }
 
 .toggle {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 13rem;
+  max-width: 100%;
   border: 1px solid var(--ink-250);
   border-radius: 999px;
   padding: 0.16rem;
   background: var(--surface-0);
+  min-height: var(--control-height);
 }
 
 .toggle button {
@@ -43,11 +77,17 @@
   color: var(--ink-700);
   cursor: pointer;
   font-size: 0.86rem;
+  line-height: 1;
+  min-height: calc(var(--control-height) - 0.32rem);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .toggle .active {
   background: var(--ink-900);
-  color: #727070;
+  color: var(--surface-0);
 }
 
 .primary,
@@ -56,6 +96,12 @@
   padding: 0.48rem 0.85rem;
   font-size: 0.84rem;
   cursor: pointer;
+  min-height: var(--control-height);
+  line-height: 1.1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
 }
 
 .primary {
@@ -82,32 +128,45 @@
 
   .controls {
     width: 100%;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
-    align-items: stretch;
+    align-items: flex-start;
+  }
+
+  .controls > * {
+    flex-shrink: 1;
   }
 
   .toggle {
-    grid-column: 1 / -1;
-    width: fit-content;
+    width: 100%;
+    max-width: 16rem;
+  }
+
+  .templatePicker {
+    width: 100%;
+  }
+
+  .templatePicker select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .primary,
+  .secondary {
+    padding: 0.5rem 0.7rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .toggle {
+    width: 100%;
+    max-width: none;
   }
 
   .primary,
   .secondary {
     width: 100%;
     text-align: center;
-    padding: 0.5rem 0.7rem;
-  }
-}
-
-@media (max-width: 460px) {
-  .controls {
-    grid-template-columns: 1fr;
-  }
-
-  .toggle {
-    width: 100%;
-    justify-content: center;
   }
 }

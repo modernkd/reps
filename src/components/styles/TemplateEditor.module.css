@@ -1,0 +1,128 @@
+.wrapper {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.wrapper label {
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.86rem;
+  color: var(--ink-700);
+}
+
+.wrapper input,
+.wrapper select {
+  border: 1px solid var(--ink-250);
+  border-radius: 0.75rem;
+  padding: 0.45rem 0.58rem;
+  background: var(--surface-0);
+  color: var(--ink-900);
+}
+
+.dayCard {
+  border: 1px solid var(--ink-180);
+  border-radius: 1rem;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+  background: color-mix(in oklab, var(--surface-0) 88%, var(--surface-3) 12%);
+}
+
+.dayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.dayMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
+.exerciseList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.exerciseRow {
+  border: 1px solid var(--ink-180);
+  border-radius: 0.85rem;
+  padding: 0.6rem;
+  display: grid;
+  gap: 0.52rem;
+  grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+  background: var(--surface-0);
+}
+
+.primary,
+.secondary,
+.ghost {
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--accent-600);
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid var(--ink-250);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  width: fit-content;
+}
+
+.ghost {
+  border: 1px solid var(--ink-200);
+  background: transparent;
+  color: var(--ink-700);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger-500);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 860px) {
+  .exerciseRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .dayMeta {
+    grid-template-columns: 1fr;
+  }
+
+  .exerciseRow {
+    grid-template-columns: 1fr;
+  }
+
+  .secondary,
+  .primary,
+  .ghost {
+    width: 100%;
+    text-align: center;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+}
