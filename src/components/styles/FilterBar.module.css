@@ -1,0 +1,28 @@
+.wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.pill {
+  --accent: var(--pill-accent, var(--ink-300));
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--ink-300));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-0));
+  color: var(--ink-800);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.pill:hover {
+  transform: translateY(-1px);
+}
+
+.active {
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--ink-400));
+  background: color-mix(in srgb, var(--accent) 26%, var(--surface-1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+}

@@ -1,0 +1,71 @@
+.wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.kicker {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  color: var(--ink-600);
+}
+
+.wrapper h1 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.6rem, 2vw, 2.15rem);
+  letter-spacing: 0.01em;
+}
+
+.controls {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.toggle {
+  display: flex;
+  border: 1px solid var(--ink-250);
+  border-radius: 999px;
+  padding: 0.16rem;
+  background: var(--surface-0);
+}
+
+.toggle button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  color: var(--ink-700);
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+
+.toggle .active {
+  background: var(--ink-900);
+  color: #fff;
+}
+
+.primary,
+.secondary {
+  border-radius: 999px;
+  padding: 0.48rem 0.85rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.primary {
+  border: 1px solid transparent;
+  background: var(--accent-600);
+  color: #fff;
+}
+
+.secondary {
+  border: 1px solid var(--ink-250);
+  background: var(--surface-0);
+  color: var(--ink-900);
+}

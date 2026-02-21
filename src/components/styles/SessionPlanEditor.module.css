@@ -1,0 +1,65 @@
+.wrapper {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.wrapper label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--ink-700);
+  font-size: 0.88rem;
+}
+
+.wrapper input,
+.wrapper select,
+.wrapper textarea {
+  border: 1px solid var(--ink-250);
+  border-radius: 9px;
+  padding: 0.45rem 0.6rem;
+  font-family: inherit;
+}
+
+.exerciseList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.exerciseRow {
+  border: 1px solid var(--ink-150);
+  border-radius: 12px;
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.primary,
+.ghost {
+  border-radius: 999px;
+  border: 1px solid var(--ink-250);
+  background: var(--surface-0);
+  padding: 0.48rem 0.85rem;
+  cursor: pointer;
+}
+
+.primary {
+  border-color: transparent;
+  background: var(--accent-600);
+  color: #fff;
+}
+
+@media (max-width: 920px) {
+  .exerciseRow {
+    grid-template-columns: 1fr;
+  }
+}

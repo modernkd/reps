@@ -1,0 +1,31 @@
+{
+  "short_name": "Reps",
+  "name": "Workout Tracker",
+  "description": "Track workouts, follow plans, and recover skipped days.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "display": "standalone",
+  "theme_color": "#13212f",
+  "background_color": "#f4efe6"
+}

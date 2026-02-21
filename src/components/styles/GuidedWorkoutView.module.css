@@ -1,0 +1,165 @@
+.wrapper {
+  border: 1px solid var(--ink-250);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-1) 65%, white);
+  box-shadow: var(--shadow-2);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.header p {
+  margin: 0.25rem 0 0;
+  color: var(--ink-600);
+  font-size: 0.85rem;
+}
+
+.abort {
+  border: 1px solid var(--ink-300);
+  border-radius: 999px;
+  background: var(--surface-0);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.card,
+.timerCard {
+  border: 1px solid var(--ink-150);
+  border-radius: 14px;
+  background: var(--surface-0);
+  padding: 0.8rem;
+}
+
+.card h3,
+.timerCard h3 {
+  margin: 0;
+}
+
+.card p,
+.timerCard p {
+  margin: 0.2rem 0 0.6rem;
+  color: var(--ink-700);
+  font-size: 0.85rem;
+}
+
+.variantControl {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.84rem;
+  color: var(--ink-700);
+  margin-bottom: 0.7rem;
+}
+
+.variantControl select {
+  border: 1px solid var(--ink-250);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+}
+
+.repControls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.repControls button,
+.timerActions button,
+.completeSet,
+.finish {
+  border: 1px solid var(--ink-250);
+  border-radius: 10px;
+  background: var(--surface-0);
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.repControls input {
+  width: 5rem;
+  border: 1px solid var(--ink-250);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+}
+
+.repControls span {
+  font-size: 0.85rem;
+  color: var(--ink-700);
+}
+
+.weightControl {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--ink-700);
+  font-size: 0.84rem;
+  margin-bottom: 0.7rem;
+}
+
+.weightControl input {
+  border: 1px solid var(--ink-250);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  width: 8rem;
+}
+
+.completeSet {
+  border-color: var(--accent-600);
+  color: var(--accent-700);
+}
+
+.timerValue {
+  font-size: 1.2rem;
+  color: var(--ink-900);
+}
+
+.timerActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.notes {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--ink-700);
+  font-size: 0.86rem;
+}
+
+.notes textarea {
+  border: 1px solid var(--ink-250);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  font-family: inherit;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.finish {
+  border-color: transparent;
+  background: var(--accent-600);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+}
+
+.finish:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

@@ -1,0 +1,50 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink-950) 65%, transparent);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 40;
+}
+
+.modal {
+  width: min(40rem, 100%);
+  max-height: 90dvh;
+  overflow: auto;
+  border-radius: 16px;
+  border: 1px solid var(--ink-200);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--ink-100);
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.closeButton {
+  border: 1px solid var(--ink-300);
+  background: var(--surface-0);
+  color: var(--ink-800);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.8rem;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  background: var(--ink-100);
+}
+
+.content {
+  padding: 1rem 1.25rem 1.25rem;
+}
