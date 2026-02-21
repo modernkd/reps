@@ -27,6 +27,7 @@ export const workoutSchema = z.object({
   date: z.string(),
   type: z.string(),
   durationMin: z.number().int().positive(),
+  targetWeightKg: z.number().positive().optional(),
   distanceKm: z.number().positive().optional(),
   intensity: intensitySchema.optional(),
   notes: z.string().max(1000).optional(),
@@ -47,6 +48,7 @@ export type WorkoutType = z.infer<typeof workoutTypeSchema>
 export const planTemplateSchema = z.object({
   id: z.string(),
   name: z.string(),
+  startDate: z.string().default('1970-01-01'),
   locale: z.string(),
   isStarter: z.boolean(),
   createdAt: z.string(),

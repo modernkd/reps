@@ -17,6 +17,7 @@ import {
   type ActiveSessionDraft,
   type ExerciseTemplate,
   type PlanDay,
+  type PlanTemplate,
   type ScheduledSession,
   type ScheduledSessionStatus,
   type SessionExercisePlan,
@@ -119,6 +120,12 @@ scheduledSessionsCollection.createIndex((row) => row.date, {
 scheduledSessionsCollection.createIndex((row) => row.status, {
   name: 'scheduled_session_status_idx',
 })
+planDaysCollection.createIndex((row) => row.templateId, {
+  name: 'plan_day_template_idx',
+})
+exerciseTemplatesCollection.createIndex((row) => row.planDayId, {
+  name: 'exercise_template_plan_day_idx',
+})
 
 async function persist(tx: Transaction<Record<string, unknown>>): Promise<void> {
   await tx.isPersisted.promise
@@ -139,6 +146,7 @@ export async function addWorkout(input: {
   date: string
   type: string
   durationMin: number
+  targetWeightKg?: number
   distanceKm?: number
   intensity?: WorkoutIntensity
   notes?: string
@@ -153,6 +161,7 @@ export async function addWorkout(input: {
     date: input.date,
     type: input.type,
     durationMin: input.durationMin,
+    targetWeightKg: input.targetWeightKg,
     distanceKm: input.distanceKm,
     intensity: input.intensity,
     notes: input.notes,
@@ -170,6 +179,7 @@ export async function updateWorkout(
     date: string
     type: string
     durationMin: number
+    targetWeightKg?: number
     distanceKm?: number
     intensity?: WorkoutIntensity
     notes?: string
@@ -180,6 +190,7 @@ export async function updateWorkout(
       draft.date = input.date
       draft.type = input.type
       draft.durationMin = input.durationMin
+      draft.targetWeightKg = input.targetWeightKg
       draft.distanceKm = input.distanceKm
       draft.intensity = input.intensity
       draft.notes = input.notes
@@ -205,6 +216,77 @@ export async function deleteWorkout(id: string): Promise<void> {
   }
 }
 
+export async function clearDataAfterDate(
+  date: string,
+): Promise<{ workoutsDeleted: number; sessionsDeleted: number }> {
+  const workoutsAfterDate = workoutsCollection.toArray.filter((workout) => workout.date > date)
+  const sessionsAfterDate = scheduledSessionsCollection.toArray.filter(
+    (session) => session.date > date,
+  )
+  const sessionIdsToDelete = new Set(sessionsAfterDate.map((session) => session.id))
+
+  for (const workout of workoutsAfterDate) {
+    await deleteWorkout(workout.id)
+  }
+
+  for (const session of sessionsAfterDate) {
+    if (!session.workoutId) {
+      continue
+    }
+
+    const linkedWorkout = workoutsCollection.get(session.workoutId)
+    if (!linkedWorkout) {
+      continue
+    }
+
+    await persist(
+      workoutsCollection.update(session.workoutId, (draft) => {
+        draft.scheduledSessionId = undefined
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
+  const draftIdsToDelete = activeSessionDraftsCollection.toArray
+    .filter((draft) => sessionIdsToDelete.has(draft.sessionId))
+    .map((draft) => draft.sessionId)
+  const planIdsToDelete = sessionPlansCollection.toArray
+    .filter((plan) => sessionIdsToDelete.has(plan.sessionId))
+    .map((plan) => plan.id)
+  const workoutsToDetach = workoutsCollection.toArray.filter(
+    (workout) =>
+      workout.scheduledSessionId !== undefined &&
+      sessionIdsToDelete.has(workout.scheduledSessionId),
+  )
+
+  for (const workout of workoutsToDetach) {
+    await persist(
+      workoutsCollection.update(workout.id, (draft) => {
+        draft.scheduledSessionId = undefined
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
+  if (draftIdsToDelete.length > 0) {
+    await persist(activeSessionDraftsCollection.delete(draftIdsToDelete))
+  }
+
+  if (planIdsToDelete.length > 0) {
+    await persist(sessionPlansCollection.delete(planIdsToDelete))
+  }
+
+  const sessionIds = Array.from(sessionIdsToDelete)
+  if (sessionIds.length > 0) {
+    await persist(scheduledSessionsCollection.delete(sessionIds))
+  }
+
+  return {
+    workoutsDeleted: workoutsAfterDate.length,
+    sessionsDeleted: sessionsAfterDate.length,
+  }
+}
+
 export async function importStarterTemplate(): Promise<void> {
   if (planTemplatesCollection.has(STARTER_TEMPLATE_ID)) {
     return
@@ -219,6 +301,133 @@ export async function importStarterTemplate(): Promise<void> {
   ])
 }
 
+export type TemplateExerciseInput = {
+  name: string
+  sets: number
+  minReps?: number
+  maxReps?: number
+  restSecDefault?: number
+}
+
+export type TemplateDayInput = {
+  weekday: number
+  label: string
+  exercises: TemplateExerciseInput[]
+}
+
+function normalizePositiveInteger(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  const normalized = Math.trunc(value)
+  return normalized > 0 ? normalized : undefined
+}
+
+function normalizeTemplateDays(days: TemplateDayInput[]): TemplateDayInput[] {
+  return days
+    .map((day) => {
+      const weekday = Math.min(7, Math.max(1, Math.trunc(day.weekday)))
+      const label = day.label.trim() || `Workout day ${weekday}`
+      const exercises = day.exercises
+        .map((exercise) => {
+          const sets = normalizePositiveInteger(exercise.sets) ?? 1
+          return {
+            name: exercise.name.trim() || 'Exercise',
+            sets,
+            minReps: normalizePositiveInteger(exercise.minReps),
+            maxReps: normalizePositiveInteger(exercise.maxReps),
+            restSecDefault: normalizePositiveInteger(exercise.restSecDefault),
+          }
+        })
+        .filter((exercise) => exercise.name.length > 0)
+
+      return {
+        weekday,
+        label,
+        exercises:
+          exercises.length > 0
+            ? exercises
+            : [
+                {
+                  name: 'Exercise',
+                  sets: 3,
+                  minReps: undefined,
+                  maxReps: undefined,
+                  restSecDefault: 90,
+                },
+              ],
+      }
+    })
+    .sort((a, b) => a.weekday - b.weekday)
+}
+
+export async function createPlanTemplate(input: {
+  name: string
+  startDate: string
+  locale?: string
+  days: TemplateDayInput[]
+}): Promise<PlanTemplate> {
+  const now = nowIso()
+  const normalizedName = input.name.trim()
+  if (!normalizedName) {
+    throw new Error('Template name is required.')
+  }
+
+  const normalizedStartDate = input.startDate.trim()
+  if (!normalizedStartDate) {
+    throw new Error('Template start date is required.')
+  }
+
+  const normalizedDays = normalizeTemplateDays(input.days)
+  if (normalizedDays.length === 0) {
+    throw new Error('At least one plan day is required.')
+  }
+
+  const template: PlanTemplate = {
+    id: createId('template'),
+    name: normalizedName,
+    startDate: normalizedStartDate,
+    locale: input.locale ?? 'en',
+    isStarter: false,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  const planDays: PlanDay[] = []
+  const exercises: ExerciseTemplate[] = []
+
+  for (const day of normalizedDays) {
+    const planDayId = createId('plan_day')
+    planDays.push({
+      id: planDayId,
+      templateId: template.id,
+      weekday: day.weekday,
+      label: day.label,
+    })
+
+    for (const exercise of day.exercises) {
+      exercises.push({
+        id: createId('exercise'),
+        planDayId,
+        name: exercise.name,
+        sets: exercise.sets,
+        minReps: exercise.minReps,
+        maxReps: exercise.maxReps,
+        restSecDefault: exercise.restSecDefault,
+      })
+    }
+  }
+
+  await Promise.all([
+    persist(planTemplatesCollection.insert(template)),
+    persist(planDaysCollection.insert(planDays)),
+    persist(exerciseTemplatesCollection.insert(exercises)),
+  ])
+
+  return template
+}
+
 function scheduledSessionId(templateId: string, planDayId: string, date: string): string {
   return `${templateId}_${planDayId}_${date}`
 }
@@ -229,6 +438,16 @@ export async function generateScheduleForRange(input: {
   to: string
 }): Promise<number> {
   const { templateId, from, to } = input
+  const template = planTemplatesCollection.get(templateId)
+  if (!template) {
+    return 0
+  }
+
+  const scheduleFrom = template.startDate > from ? template.startDate : from
+  if (scheduleFrom > to) {
+    return 0
+  }
+
   const templateDays = planDaysCollection.toArray.filter(
     (day) => day.templateId === templateId,
   )
@@ -238,7 +457,7 @@ export async function generateScheduleForRange(input: {
   }
 
   const recordsToInsert: ScheduledSession[] = []
-  let cursor = parseISO(from)
+  let cursor = parseISO(scheduleFrom)
   const end = parseISO(to)
 
   while (!isAfter(cursor, end)) {
