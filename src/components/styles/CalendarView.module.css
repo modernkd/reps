@@ -24,7 +24,7 @@
 
 .monthButton {
   border: 1px solid var(--ink-250);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: var(--surface-0);
   padding: 0.4rem 0.75rem;
   font-size: 0.82rem;
@@ -35,6 +35,12 @@
 
 .monthButton:active {
   transform: translateY(1px);
+}
+
+.monthButton:focus-visible,
+.day:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .weekdays {
@@ -119,7 +125,9 @@
 
 .selected {
   border-color: var(--accent-600);
-  box-shadow: 0 0 0 1px var(--accent-600);
+  box-shadow:
+    0 0 0 1px var(--accent-600),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent-600) 20%, #fff);
 }
 
 .hasWorkout {
@@ -127,13 +135,13 @@
 }
 
 .pastCompleted {
-  background: color-mix(in srgb, #2f9d45 18%, var(--surface-0));
-  border-color: color-mix(in srgb, #2f9d45 45%, var(--ink-200));
+  background: color-mix(in srgb, #2f9d45 24%, var(--surface-0));
+  border-color: color-mix(in srgb, #2f9d45 55%, var(--ink-200));
 }
 
 .pastSkipped {
-  background: color-mix(in srgb, #ee8f2a 20%, var(--surface-0));
-  border-color: color-mix(in srgb, #ee8f2a 45%, var(--ink-200));
+  background: color-mix(in srgb, #ee8f2a 28%, var(--surface-0));
+  border-color: color-mix(in srgb, #ee8f2a 56%, var(--ink-200));
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -215,15 +223,38 @@
   }
 
   .metrics em {
-    border-radius: 999px;
+    border-radius: var(--radius-control);
     background: color-mix(in srgb, var(--accent-200) 18%, var(--surface-0));
     width: fit-content;
     padding: 0.04rem 0.22rem;
     font-size: 0.55rem;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .metricLabel {
     display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .header {
+    padding: 0.56rem;
+  }
+
+  .monthButton {
+    min-height: 2rem;
+    padding: 0.3rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .day {
+    border-radius: 8px;
+    padding: 0.22rem;
+  }
+
+  .dayNumber {
+    font-size: 0.75rem;
   }
 }
 

@@ -33,6 +33,7 @@ import type {
 } from '@/lib/types'
 import { useReducedMotion } from '@/lib/useReducedMotion'
 
+import SimpleGraph from './react-bits/simple-graph'
 import styles from './styles/GraphView.module.css'
 
 type GraphViewProps = {
@@ -52,8 +53,6 @@ type TooltipState = {
 
 const WIDTH = 900
 const HEIGHT = 360
-const WEIGHT_HEIGHT = 190
-const PERFORMANCE_HEIGHT = 220
 const MARGIN = { top: 18, right: 56, bottom: 34, left: 48 }
 
 export function GraphView({
@@ -70,10 +69,6 @@ export function GraphView({
   const axisBottomRef = useRef<SVGGElement | null>(null)
   const axisLeftRef = useRef<SVGGElement | null>(null)
   const axisRightRef = useRef<SVGGElement | null>(null)
-  const weightAxisBottomRef = useRef<SVGGElement | null>(null)
-  const weightAxisLeftRef = useRef<SVGGElement | null>(null)
-  const perfAxisBottomRef = useRef<SVGGElement | null>(null)
-  const perfAxisLeftRef = useRef<SVGGElement | null>(null)
   const chartRef = useRef<HTMLDivElement | null>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [focusTypeId, setFocusTypeId] = useState<string>('')
@@ -101,7 +96,6 @@ export function GraphView({
   const maxFrequency = max(points, (point) => point.workoutsPerWeek) ?? 1
   const maxDuration = max(points, (point) => point.totalDurationPerWeek) ?? 1
   const weightPoints = points.filter((point) => point.avgWeightKg !== null)
-  const maxWeight = max(weightPoints, (point) => point.avgWeightKg ?? 0) ?? 1
 
   const xScale = useMemo(
     () => scaleTime().domain(xDomain).range([0, drawableWidth]),
@@ -120,16 +114,6 @@ export function GraphView({
     [drawableHeight, maxDuration],
   )
 
-  const weightDrawableHeight = WEIGHT_HEIGHT - MARGIN.top - MARGIN.bottom
-  const yWeight = useMemo(
-    () =>
-      scaleLinear()
-        .domain([0, Math.max(1, maxWeight)])
-        .nice()
-        .range([weightDrawableHeight, 0]),
-    [maxWeight, weightDrawableHeight],
-  )
-
   const frequencyPath = useMemo(() => {
     const shape = line<WeeklyTrendPoint>()
       .x((point) => xScale(parseISO(point.weekStart)))
@@ -145,15 +129,6 @@ export function GraphView({
       .curve(curveMonotoneX)
     return shape(points) ?? ''
   }, [points, xScale, yDuration])
-
-  const weightPath = useMemo(() => {
-    const shape = line<WeeklyTrendPoint>()
-      .defined((point) => point.avgWeightKg !== null)
-      .x((point) => xScale(parseISO(point.weekStart)))
-      .y((point) => yWeight(point.avgWeightKg ?? 0))
-      .curve(curveMonotoneX)
-    return shape(points) ?? ''
-  }, [points, xScale, yWeight])
 
   const scopedWorkouts = useMemo(() => {
     const activeTypes = selectedTypeIds.length > 0 ? new Set(selectedTypeIds) : null
@@ -237,55 +212,23 @@ export function GraphView({
       ? `${selectedExercise} ${copy.graph.exerciseProgressSuffix}`
       : copy.graph.exerciseProgress
 
-  const performanceDrawableHeight = PERFORMANCE_HEIGHT - MARGIN.top - MARGIN.bottom
-  const performanceDateExtent = extent(
-    performancePoints.map((point) => parseISO(point.date)),
-  )
-
-  const performanceXDomain: [Date, Date] = useMemo(() => {
-    const start = performanceDateExtent[0]
-    const end = performanceDateExtent[1]
-
-    if (!start || !end) {
-      const now = new Date()
-      return [now, now]
-    }
-
-    if (start.getTime() === end.getTime()) {
-      return [start, new Date(end.getTime() + 24 * 60 * 60 * 1000)]
-    }
-
-    return [start, end]
-  }, [performanceDateExtent])
-
-  const performanceXScale = useMemo(
-    () => scaleTime().domain(performanceXDomain).range([0, drawableWidth]),
-    [drawableWidth, performanceXDomain],
-  )
-
-  const performanceMax = max(performancePoints, (point) => point.value) ?? 1
-  const performanceMin = Math.min(
-    ...performancePoints.map((point) => point.value),
-    0,
-  )
-
-  const performanceYScale = useMemo(
+  const weightTrendData = useMemo(
     () =>
-      scaleLinear()
-        .domain([performanceMin, Math.max(1, performanceMax)])
-        .nice()
-        .range([performanceDrawableHeight, 0]),
-    [performanceDrawableHeight, performanceMax, performanceMin],
+      weightPoints.map((point) => ({
+        value: point.avgWeightKg ?? 0,
+        label: format(parseISO(point.weekStart), 'MMM d', { locale: dateLocale }),
+      })),
+    [dateLocale, weightPoints],
   )
 
-  const performancePath = useMemo(() => {
-    const shape = line<ProgressPoint>()
-      .x((point) => performanceXScale(parseISO(point.date)))
-      .y((point) => performanceYScale(point.value))
-      .curve(curveMonotoneX)
-
-    return shape(performancePoints) ?? ''
-  }, [performancePoints, performanceXScale, performanceYScale])
+  const performanceTrendData = useMemo(
+    () =>
+      performancePoints.map((point) => ({
+        value: point.value,
+        label: format(parseISO(point.date), 'MMM d', { locale: dateLocale }),
+      })),
+    [dateLocale, performancePoints],
+  )
 
   useEffect(() => {
     if (!axisBottomRef.current || !axisLeftRef.current || !axisRightRef.current) {
@@ -303,34 +246,6 @@ export function GraphView({
     select(axisLeftRef.current).call(leftAxis)
     select(axisRightRef.current).call(rightAxis)
   }, [dateLocale, points.length, xScale, yDuration, yFrequency])
-
-  useEffect(() => {
-    if (!weightAxisBottomRef.current || !weightAxisLeftRef.current) {
-      return
-    }
-
-    const xAxis = axisBottom<Date>(xScale)
-      .ticks(Math.min(8, points.length))
-      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
-    const yAxis = axisLeft(yWeight).ticks(4)
-
-    select(weightAxisBottomRef.current).call(xAxis)
-    select(weightAxisLeftRef.current).call(yAxis)
-  }, [dateLocale, points.length, xScale, yWeight])
-
-  useEffect(() => {
-    if (!perfAxisBottomRef.current || !perfAxisLeftRef.current) {
-      return
-    }
-
-    const xAxis = axisBottom<Date>(performanceXScale)
-      .ticks(Math.min(8, Math.max(2, performancePoints.length)))
-      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
-    const yAxis = axisLeft(performanceYScale).ticks(5)
-
-    select(perfAxisBottomRef.current).call(xAxis)
-    select(perfAxisLeftRef.current).call(yAxis)
-  }, [dateLocale, performancePoints.length, performanceXScale, performanceYScale])
 
   useEffect(() => {
     if (!chartRef.current || reducedMotion) {
@@ -401,6 +316,17 @@ export function GraphView({
         <p aria-live="polite">{copy.graph.subtitle}</p>
       </header>
 
+      <div className={styles.legend} aria-hidden>
+        <span className={styles.legendItem}>
+          <span className={styles.legendSwatchWorkouts} />
+          workouts / week
+        </span>
+        <span className={styles.legendItem}>
+          <span className={styles.legendSwatchDuration} />
+          duration / week
+        </span>
+      </div>
+
       <div className={styles.chartWrap} ref={chartRef}>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -434,7 +360,25 @@ export function GraphView({
                     cx={x}
                     cy={yFrequency(point.workoutsPerWeek)}
                     r={4.2}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${format(parseISO(point.weekStart), 'MMM d', {
+                      locale: dateLocale,
+                    })}: ${copy.graph.tooltipWorkouts(point.workoutsPerWeek)}`}
                     onClick={() => onPointSelect(point.weekStart)}
+                    onFocus={() =>
+                      setTooltip({
+                        x: MARGIN.left + xScale(parseISO(point.weekStart)),
+                        y: MARGIN.top + yFrequency(point.workoutsPerWeek),
+                        point,
+                      })
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onPointSelect(point.weekStart)
+                      }
+                    }}
                   />
                   <circle
                     data-anim="point"
@@ -442,7 +386,18 @@ export function GraphView({
                     cx={x}
                     cy={yDuration(point.totalDurationPerWeek)}
                     r={3.5}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${format(parseISO(point.weekStart), 'MMM d', {
+                      locale: dateLocale,
+                    })}: ${d3Format(',')(point.totalDurationPerWeek)} min`}
                     onClick={() => onPointSelect(point.weekStart)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        onPointSelect(point.weekStart)
+                      }
+                    }}
                   />
                 </g>
               )
@@ -484,42 +439,22 @@ export function GraphView({
       {weightPoints.length > 0 ? (
         <div className={styles.weightWrap}>
           <h4>{copy.graph.avgWeightTitle}</h4>
-          <svg
-            viewBox={`0 0 ${WIDTH} ${WEIGHT_HEIGHT}`}
-            className={styles.chart}
-            role="img"
-            aria-label={copy.graph.avgWeightAria}
-          >
-            <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
-              <g className={styles.gridLines}>
-                {yWeight.ticks(4).map((tick) => (
-                  <line
-                    key={tick}
-                    x1={0}
-                    x2={drawableWidth}
-                    y1={yWeight(tick)}
-                    y2={yWeight(tick)}
-                  />
-                ))}
-              </g>
-
-              <path d={weightPath} data-anim="line" className={styles.weightPath} />
-
-              {weightPoints.map((point) => (
-                <circle
-                  key={`weight_${point.weekStart}`}
-                  data-anim="point"
-                  className={styles.weightPoint}
-                  cx={xScale(parseISO(point.weekStart))}
-                  cy={yWeight(point.avgWeightKg ?? 0)}
-                  r={3.8}
-                />
-              ))}
-
-              <g ref={weightAxisBottomRef} transform={`translate(0, ${weightDrawableHeight})`} />
-              <g ref={weightAxisLeftRef} />
-            </g>
-          </svg>
+          <SimpleGraph
+            data={weightTrendData}
+            height={180}
+            lineColor="#2f6f4f"
+            dotColor="#2f6f4f"
+            graphLineThickness={2.4}
+            dotSize={4}
+            animationDuration={0.6}
+            showGrid
+            gridLines="horizontal"
+            gridStyle="dashed"
+            className={styles.simpleGraph}
+          />
+          <p className={styles.metricLabel} aria-label={copy.graph.avgWeightAria}>
+            kg
+          </p>
         </div>
       ) : (
         <p className={styles.weightHint}>{copy.graph.avgWeightHint}</p>
@@ -575,49 +510,19 @@ export function GraphView({
         </div>
 
         {performancePoints.length > 0 ? (
-          <svg
-            viewBox={`0 0 ${WIDTH} ${PERFORMANCE_HEIGHT}`}
-            className={styles.chart}
-            role="img"
-            aria-label={`${performanceTitle} ${copy.graph.chartSuffix}`}
-          >
-            <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
-              <g className={styles.gridLines}>
-                {performanceYScale.ticks(5).map((tick) => (
-                  <line
-                    key={tick}
-                    x1={0}
-                    x2={drawableWidth}
-                    y1={performanceYScale(tick)}
-                    y2={performanceYScale(tick)}
-                  />
-                ))}
-              </g>
-
-              <path
-                d={performancePath}
-                data-anim="line"
-                className={styles.performancePath}
-              />
-
-              {performancePoints.map((point) => (
-                <circle
-                  key={`${point.date}_${point.value}`}
-                  data-anim="point"
-                  className={styles.performancePoint}
-                  cx={performanceXScale(parseISO(point.date))}
-                  cy={performanceYScale(point.value)}
-                  r={3.8}
-                />
-              ))}
-
-              <g
-                ref={perfAxisBottomRef}
-                transform={`translate(0, ${performanceDrawableHeight})`}
-              />
-              <g ref={perfAxisLeftRef} />
-            </g>
-          </svg>
+          <SimpleGraph
+            data={performanceTrendData}
+            height={210}
+            lineColor="#0f766e"
+            dotColor="#0f766e"
+            graphLineThickness={2.4}
+            dotSize={4}
+            animationDuration={0.65}
+            showGrid
+            gridLines="horizontal"
+            gridStyle="dashed"
+            className={styles.simpleGraph}
+          />
         ) : (
           <p className={styles.weightHint}>
             {isRunLike

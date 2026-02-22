@@ -22,6 +22,8 @@
 
 .controls {
   --control-height: 2.35rem;
+  --control-radius: 0.72rem;
+  --control-radius-inner: 0.56rem;
   display: flex;
   gap: 0.6rem;
   flex-wrap: wrap;
@@ -34,36 +36,159 @@
 
 .templatePicker {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.28rem;
   font-size: 0.78rem;
   color: var(--ink-600);
   justify-items: start;
+  position: relative;
 }
 
-.templatePicker span {
+.templatePicker label {
   min-height: 1rem;
   line-height: 1;
 }
 
-.templatePicker select {
+.templatePickerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  width: 100%;
+}
+
+.templateSelect {
+  appearance: none;
   border: 1px solid var(--ink-250);
-  border-radius: 999px;
-  padding: 0.42rem 0.75rem;
+  border-radius: var(--control-radius);
+  padding: 0.42rem 2.05rem 0.42rem 0.72rem;
   background: var(--surface-0);
   color: var(--ink-900);
   font-size: 0.84rem;
   min-height: var(--control-height);
   line-height: 1.15;
   min-width: 12.5rem;
+  flex: 1;
+  cursor: default;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-600) 50%),
+    linear-gradient(135deg, var(--ink-600) 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.92rem) calc(50% - 0.12rem),
+    calc(100% - 0.62rem) calc(50% - 0.12rem);
+  background-size: 0.32rem 0.32rem, 0.32rem 0.32rem;
+  background-repeat: no-repeat;
+}
+
+.templateSelect:disabled {
+  color: var(--ink-600);
+  opacity: 0.8;
+}
+
+.newTemplateAction {
+  border: 1px solid var(--ink-250);
+  border-radius: var(--control-radius);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  font-size: 0.82rem;
+  min-height: var(--control-height);
+  padding: 0.42rem 0.7rem;
+  line-height: 1.1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.templateSelect:focus-visible,
+.newTemplateAction:focus-visible,
+.meatball:focus-visible,
+.actionsMenu button:focus-visible,
+.toggle button:focus-visible,
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.templateActions {
+  position: relative;
+  display: block;
+}
+
+.templateActions summary {
+  list-style: none;
+}
+
+.templateActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.meatball {
+  border: 1px solid var(--ink-250);
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--ink-700);
+  width: var(--control-height);
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.templateActions[data-disabled="true"] .meatball {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actionsMenu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  border: 1px solid var(--ink-250);
+  border-radius: 0.65rem;
+  background: var(--surface-0);
+  box-shadow: 0 10px 22px rgba(10, 16, 28, 0.17);
+  padding: 0.25rem;
+  min-width: 9rem;
+  display: grid;
+  gap: 0.1rem;
+  z-index: 20;
+}
+
+.actionsMenu button {
+  border: 0;
+  background: transparent;
+  color: var(--ink-900);
+  border-radius: 0.45rem;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 0.42rem 0.5rem;
+  cursor: pointer;
+}
+
+.actionsMenu button:hover {
+  background: var(--surface-1);
+}
+
+.actionsMenu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.actionsMenu button:disabled:hover {
+  background: transparent;
+}
+
+.deleteAction {
+  color: var(--danger-600, #d33a49);
 }
 
 .toggle {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: 13rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: min(18rem, 100%);
   max-width: 100%;
   border: 1px solid var(--ink-250);
-  border-radius: 999px;
+  border-radius: var(--control-radius);
   padding: 0.16rem;
   background: var(--surface-0);
   min-height: var(--control-height);
@@ -71,7 +196,7 @@
 
 .toggle button {
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--control-radius-inner);
   padding: 0.4rem 0.75rem;
   background: transparent;
   color: var(--ink-700);
@@ -92,7 +217,7 @@
 
 .primary,
 .secondary {
-  border-radius: 999px;
+  border-radius: var(--control-radius);
   padding: 0.48rem 0.85rem;
   font-size: 0.84rem;
   cursor: pointer;
@@ -147,18 +272,73 @@
     width: 100%;
   }
 
-  .templatePicker select {
+  .templatePickerRow {
+    width: 100%;
+  }
+
+  .templateSelect {
     width: 100%;
     min-width: 0;
+    min-height: 2.6rem;
+  }
+
+  .newTemplateAction {
+    min-height: 2.6rem;
   }
 
   .primary,
   .secondary {
-    padding: 0.5rem 0.7rem;
+    width: 100%;
+    min-height: 2.6rem;
+    padding: 0.58rem 0.8rem;
+    font-size: 0.9rem;
   }
 }
 
 @media (max-width: 460px) {
+  .wrapper h1 {
+    font-size: 1.35rem;
+  }
+
+  .toggle button {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .templatePickerRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.35rem;
+    align-items: stretch;
+  }
+
+  .templateSelect {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .meatball {
+    width: 2.85rem;
+    min-width: 2.85rem;
+    min-height: 2.3rem;
+  }
+
+  .newTemplateAction {
+    min-height: 2.3rem;
+  }
+
+  .actionsMenu {
+    position: static;
+    right: auto;
+    width: 100%;
+    box-shadow: none;
+    margin-top: 0.3rem;
+  }
+
+  .templateActions {
+    justify-self: end;
+  }
+
   .toggle {
     width: 100%;
     max-width: none;
@@ -168,5 +348,21 @@
   .secondary {
     width: 100%;
     text-align: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .controls {
+    padding-bottom: calc(4.7rem + env(safe-area-inset-bottom));
+  }
+
+  .primary {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    z-index: 35;
+    border-radius: var(--control-radius);
+    box-shadow: 0 14px 28px -18px rgba(0, 0, 0, 0.55);
   }
 }

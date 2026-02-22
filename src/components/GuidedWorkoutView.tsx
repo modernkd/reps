@@ -19,7 +19,7 @@ import {
   getCatalogExerciseVariants,
   isCustomExerciseVariant,
 } from '@/lib/variants'
-import { useExerciseReferenceImage } from '@/lib/useExerciseReferenceImage'
+import { useExerciseReferenceContent } from '@/lib/useExerciseReferenceContent'
 import { inferWorkoutTypeFromPlanDay } from '@/lib/workoutType'
 import type {
   ActiveSessionDraft,
@@ -42,6 +42,11 @@ type GuidedWorkoutViewProps = {
   onComplete: (summary: SessionSummary, notes?: string) => Promise<void>
   onAbort: () => Promise<void>
   onSwapExerciseVariant: (exerciseIndex: number, nextName: string) => Promise<void>
+  latestWeightByExerciseName: Record<string, number>
+}
+
+function normalizeExerciseName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 function getRemainingSeconds(restEndAt?: string, explicitRemaining?: number): number {
@@ -95,6 +100,7 @@ export function GuidedWorkoutView({
   onComplete,
   onAbort,
   onSwapExerciseVariant,
+  latestWeightByExerciseName,
 }: GuidedWorkoutViewProps) {
   const copy = getCopy(language)
   const dateLocale = getDateLocale(language)
@@ -113,6 +119,7 @@ export function GuidedWorkoutView({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [variantInput, setVariantInput] = useState('')
   const [imageRefreshKey, setImageRefreshKey] = useState(0)
+  const [referenceImageIndex, setReferenceImageIndex] = useState(0)
   const [completionPreview, setCompletionPreview] = useState<CompletionPreview | null>(
     null,
   )
@@ -126,12 +133,19 @@ export function GuidedWorkoutView({
     ? isCustomExerciseVariant(currentExercise.id, typedVariant)
     : false
   const referenceExerciseName = typedVariant || currentExercise?.name || ''
-  const { image: referenceImage, isLoading: isReferenceImageLoading } =
-    useExerciseReferenceImage(
+  const { content: referenceContent, isLoading: isReferenceImageLoading } =
+    useExerciseReferenceContent(
       currentExercise?.id ?? '',
       referenceExerciseName,
       imageRefreshKey,
     )
+  const referenceImages = referenceContent?.images ?? []
+  const referenceInstructions = referenceContent?.instructions ?? []
+  const hasReferenceImages = referenceImages.length > 0
+  const activeReferenceImage = hasReferenceImages
+    ? referenceImages[referenceImageIndex % referenceImages.length]
+    : undefined
+  const canCycleReferenceImages = referenceImages.length > 1
 
   const totalSetsTarget = exercises.reduce((acc, exercise) => acc + exercise.sets, 0)
   const completedSets = setLogs.length
@@ -152,6 +166,31 @@ export function GuidedWorkoutView({
 
     setVariantInput(currentExercise.name)
   }, [currentExercise?.id, currentExercise?.name])
+
+  useEffect(() => {
+    setReferenceImageIndex(0)
+  }, [currentExercise?.id, referenceExerciseName, imageRefreshKey])
+
+  useEffect(() => {
+    if (!currentExercise) {
+      setWeightKg(0)
+      return
+    }
+
+    const normalized = normalizeExerciseName(currentExercise.name)
+    const nextWeight = latestWeightByExerciseName[normalized]
+    if (typeof nextWeight === 'number') {
+      setWeightKg(nextWeight)
+      return
+    }
+
+    setWeightKg(currentExercise.targetMassKg ?? 0)
+  }, [
+    currentExercise?.id,
+    currentExercise?.name,
+    currentExercise?.targetMassKg,
+    latestWeightByExerciseName,
+  ])
 
   useEffect(() => {
     if (timerPaused || restSecLeft <= 0) {
@@ -364,6 +403,9 @@ export function GuidedWorkoutView({
           {currentExercise?.minReps || currentExercise?.maxReps
             ? ` · ${copy.guided.target} ${currentExercise.minReps ?? currentExercise.maxReps}-${currentExercise.maxReps ?? currentExercise.minReps} ${copy.guided.reps}`
             : ''}
+          {currentExercise?.targetMassKg
+            ? ` · ${copy.guided.target} ${currentExercise.targetMassKg} kg`
+            : ''}
         </p>
 
         {currentExercise ? (
@@ -394,20 +436,66 @@ export function GuidedWorkoutView({
 
         {currentExercise ? (
           <section className={styles.referenceCard}>
-            {referenceImage ? (
-              <img
-                src={referenceImage.url}
-                alt={copy.guided.referenceImageAlt(referenceExerciseName)}
-                loading="lazy"
-                className={styles.referenceImage}
-              />
-            ) : (
+            <div className={styles.referenceMediaFrame}>
+              {activeReferenceImage ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.referenceImageButton}
+                    onClick={() => {
+                      if (!canCycleReferenceImages) {
+                        return
+                      }
+
+                      setReferenceImageIndex((current) => (current + 1) % referenceImages.length)
+                    }}
+                    aria-label={
+                      canCycleReferenceImages
+                        ? copy.guided.cycleReferenceImage(
+                            referenceImageIndex + 1,
+                            referenceImages.length,
+                          )
+                        : copy.guided.referenceImageAlt(referenceExerciseName)
+                    }
+                  >
+                    <img
+                      src={activeReferenceImage}
+                      alt={copy.guided.referenceImageAlt(referenceExerciseName)}
+                      loading="lazy"
+                      className={styles.referenceImage}
+                    />
+                  </button>
+                  {canCycleReferenceImages ? (
+                    <span className={styles.referenceImageStep}>
+                      {referenceImageIndex + 1}/{referenceImages.length}
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                <p className={styles.referenceHint}>
+                  {isReferenceImageLoading
+                    ? copy.guided.loadingReferenceImage
+                    : copy.guided.missingReferenceImage}
+                </p>
+              )}
+            </div>
+
+            {canCycleReferenceImages ? (
               <p className={styles.referenceHint}>
-                {isReferenceImageLoading
-                  ? copy.guided.loadingReferenceImage
-                  : copy.guided.missingReferenceImage}
+                {copy.guided.cycleReferenceImage(referenceImageIndex + 1, referenceImages.length)}
               </p>
-            )}
+            ) : null}
+
+            {referenceInstructions.length > 0 ? (
+              <section className={styles.referenceInstructions}>
+                <h4>{copy.guided.instructionsTitle}</h4>
+                <ol>
+                  {referenceInstructions.map((instruction, index) => (
+                    <li key={`${referenceExerciseName}-${index}`}>{instruction}</li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
 
             {customExercise ? (
               <>

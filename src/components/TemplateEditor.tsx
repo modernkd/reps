@@ -1,16 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { format, parseISO } from 'date-fns'
 
 import type { TemplateDayInput, TemplateExerciseInput } from '@/lib/db'
-import { getCopy, type AppLanguage } from '@/lib/i18n'
+import { getCopy, getDateLocale, type AppLanguage } from '@/lib/i18n'
+import type { ExerciseHistoryEntry } from '@/lib/selectors'
+import { useExerciseReferenceContent } from '@/lib/useExerciseReferenceContent'
 
+import { ExerciseSwapInsights } from './ExerciseSwapInsights'
 import styles from './styles/TemplateEditor.module.css'
 
 type TemplateEditorProps = {
   language: AppLanguage
-  mode: 'create' | 'duplicate'
+  mode: 'create' | 'duplicate' | 'edit'
   initialName: string
   initialStartDate: string
   initialDays: TemplateDayInput[]
+  exerciseSuggestions: string[]
+  exerciseHistory: ExerciseHistoryEntry[]
   onSubmit: (value: {
     name: string
     startDate: string
@@ -25,6 +31,16 @@ type DayState = {
   weekday: number
   label: string
   exercises: ExerciseState[]
+}
+
+type ExerciseRowProps = {
+  language: AppLanguage
+  exercise: ExerciseState
+  suggestions: string[]
+  historyEntry?: ExerciseHistoryEntry
+  onChange: (updater: (exercise: ExerciseState) => ExerciseState) => void
+  onRemove: () => void
+  disableRemove: boolean
 }
 
 function createUiId(prefix: string): string {
@@ -88,6 +104,214 @@ function normalizeOptionalPositiveNumber(value: string): number | undefined {
   return Math.trunc(parsed)
 }
 
+function normalizeExerciseName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function getExerciseIdGuess(name: string): string {
+  const normalized = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  return normalized ? `ex_${normalized}` : 'ex_custom'
+}
+
+function TemplateExerciseRow({
+  language,
+  exercise,
+  suggestions,
+  historyEntry,
+  onChange,
+  onRemove,
+  disableRemove,
+}: ExerciseRowProps) {
+  const copy = getCopy(language)
+  const normalizedName = normalizeExerciseName(exercise.name)
+  const [referenceImageIndex, setReferenceImageIndex] = useState(0)
+  const { content, isLoading } = useExerciseReferenceContent(
+    getExerciseIdGuess(exercise.name),
+    exercise.name,
+    normalizedName.length,
+  )
+  const referenceImages = content?.images ?? []
+  const currentReferenceImageIndex = referenceImages.length
+    ? referenceImageIndex % referenceImages.length
+    : 0
+  const activeReferenceImage = referenceImages.length
+    ? referenceImages[currentReferenceImageIndex]
+    : undefined
+  const canCycleReferenceImages = referenceImages.length > 1
+
+  useEffect(() => {
+    setReferenceImageIndex(0)
+  }, [exercise.uiId, exercise.name, referenceImages.length])
+
+  const historyWeight =
+    historyEntry && historyEntry.lastWeightKg !== null
+      ? Number(historyEntry.lastWeightKg.toFixed(1))
+      : null
+  const historyDate = historyEntry
+    ? format(parseISO(historyEntry.lastDate), 'MMM d', {
+        locale: getDateLocale(language),
+      })
+    : null
+  const listId = `template_exercise_${exercise.uiId}`
+  const isNewExercise = normalizedName.length > 0 && !historyEntry
+
+  return (
+    <li className={styles.exerciseCard}>
+      <div className={styles.cardHeader}>
+        <label className={styles.nameField}>
+          {copy.templateForm.exerciseName}
+          <input
+            list={listId}
+            value={exercise.name}
+            placeholder={copy.sessionPlan.exerciseVariantPlaceholder}
+            onChange={(event) => onChange((current) => ({ ...current, name: event.target.value }))}
+          />
+          <datalist id={listId}>
+            {suggestions.map((suggestion) => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
+        </label>
+        <div className={styles.historyMeta}>
+          {historyEntry && historyDate ? (
+            <p className={styles.metaInfo}>{copy.sessionPlan.lastLogged(historyWeight, historyDate)}</p>
+          ) : null}
+          {isNewExercise ? <p className={styles.newBadge}>{copy.sessionPlan.addCustomExercise}</p> : null}
+        </div>
+      </div>
+
+      <div className={styles.cardBody}>
+        <div className={styles.referenceCard}>
+          {activeReferenceImage ? (
+            <div className={styles.referenceImageFrame}>
+              <button
+                type="button"
+                className={styles.referenceImageButton}
+                onClick={() => {
+                  if (!canCycleReferenceImages) {
+                    return
+                  }
+
+                  setReferenceImageIndex((current) => (current + 1) % referenceImages.length)
+                }}
+                aria-label={
+                  canCycleReferenceImages
+                    ? copy.guided.cycleReferenceImage(
+                        currentReferenceImageIndex + 1,
+                        referenceImages.length,
+                      )
+                    : copy.sessionPlan.referenceImageAlt(exercise.name)
+                }
+              >
+                <img
+                  src={activeReferenceImage}
+                  alt={copy.sessionPlan.referenceImageAlt(exercise.name)}
+                  loading="lazy"
+                  className={styles.referenceImage}
+                />
+              </button>
+              {canCycleReferenceImages ? (
+                <span className={styles.referenceImageStep}>
+                  {currentReferenceImageIndex + 1}/{referenceImages.length}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <p className={styles.referenceHint}>
+              {isLoading
+                ? copy.sessionPlan.loadingReferenceImage
+                : copy.sessionPlan.missingReferenceImage}
+            </p>
+          )}
+          {canCycleReferenceImages ? (
+            <p className={styles.referenceCycleHint}>
+              {copy.guided.cycleReferenceImage(
+                currentReferenceImageIndex + 1,
+                referenceImages.length,
+              )}
+            </p>
+          ) : null}
+        </div>
+        <div className={styles.cardFieldGrid}>
+          <label className={styles.fieldGroup}>
+            {copy.templateForm.sets}
+            <input
+              type="number"
+              min={1}
+              value={exercise.sets}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  sets: normalizeOptionalPositiveNumber(event.target.value) ?? 1,
+                }))
+              }
+            />
+          </label>
+
+          <label className={styles.fieldGroup}>
+            {copy.templateForm.minReps}
+            <input
+              type="number"
+              min={1}
+              value={exercise.minReps ?? ''}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  minReps: normalizeOptionalPositiveNumber(event.target.value),
+                }))
+              }
+            />
+          </label>
+
+          <label className={styles.fieldGroup}>
+            {copy.templateForm.maxReps}
+            <input
+              type="number"
+              min={1}
+              value={exercise.maxReps ?? ''}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  maxReps: normalizeOptionalPositiveNumber(event.target.value),
+                }))
+              }
+            />
+          </label>
+
+          <label className={styles.fieldGroup}>
+            {copy.templateForm.restSec}
+            <input
+              type="number"
+              min={15}
+              value={exercise.restSecDefault ?? ''}
+              onChange={(event) =>
+                onChange((current) => ({
+                  ...current,
+                  restSecDefault: normalizeOptionalPositiveNumber(event.target.value),
+                }))
+              }
+            />
+          </label>
+        </div>
+      </div>
+
+      <ExerciseSwapInsights
+        language={language}
+        exerciseName={exercise.name}
+        onSwap={(nextExerciseName) =>
+          onChange((current) => ({ ...current, name: nextExerciseName }))
+        }
+      />
+
+      <div className={styles.cardFooter}>
+        <button type="button" className={styles.ghost} onClick={onRemove} disabled={disableRemove}>
+          {copy.templateForm.removeExercise}
+        </button>
+      </div>
+    </li>
+  )
+}
+
 export function createDefaultTemplateDays(): TemplateDayInput[] {
   return [
     {
@@ -112,6 +336,8 @@ export function TemplateEditor({
   initialName,
   initialStartDate,
   initialDays,
+  exerciseSuggestions,
+  exerciseHistory,
   onSubmit,
   onCancel,
 }: TemplateEditorProps) {
@@ -123,6 +349,13 @@ export function TemplateEditor({
   )
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const historyLookup = useMemo(() => {
+    const map = new Map<string, ExerciseHistoryEntry>()
+    for (const entry of exerciseHistory) {
+      map.set(normalizeExerciseName(entry.name), entry)
+    }
+    return map
+  }, [exerciseHistory])
 
   const weekdayOptions = useMemo(
     () =>
@@ -136,13 +369,19 @@ export function TemplateEditor({
   const submitLabel =
     mode === 'duplicate'
       ? copy.templateForm.duplicateTemplate
-      : copy.templateForm.createTemplate
+      : mode === 'edit'
+        ? copy.templateForm.updateTemplate
+        : copy.templateForm.createTemplate
 
   const updateDay = (dayId: string, updater: (day: DayState) => DayState) => {
     setDays((current) => current.map((day) => (day.uiId === dayId ? updater(day) : day)))
   }
 
   const handleSubmit = async () => {
+    if (isSaving) {
+      return
+    }
+
     if (!name.trim() || !startDate) {
       setError(copy.templateForm.saveTemplateError)
       return
@@ -243,130 +482,32 @@ export function TemplateEditor({
 
           <ul className={styles.exerciseList}>
             {day.exercises.map((exercise) => (
-              <li key={exercise.uiId} className={styles.exerciseRow}>
-                <label>
-                  {copy.templateForm.exerciseName}
-                  <input
-                    value={exercise.name}
-                    onChange={(event) =>
-                      updateDay(day.uiId, (current) => ({
-                        ...current,
-                        exercises: current.exercises.map((item) =>
-                          item.uiId === exercise.uiId
-                            ? { ...item, name: event.target.value }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label>
-                  {copy.templateForm.sets}
-                  <input
-                    type="number"
-                    min={1}
-                    value={exercise.sets}
-                    onChange={(event) =>
-                      updateDay(day.uiId, (current) => ({
-                        ...current,
-                        exercises: current.exercises.map((item) =>
-                          item.uiId === exercise.uiId
-                            ? {
-                                ...item,
-                                sets: normalizeOptionalPositiveNumber(event.target.value) ?? 1,
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label>
-                  {copy.templateForm.minReps}
-                  <input
-                    type="number"
-                    min={1}
-                    value={exercise.minReps ?? ''}
-                    onChange={(event) =>
-                      updateDay(day.uiId, (current) => ({
-                        ...current,
-                        exercises: current.exercises.map((item) =>
-                          item.uiId === exercise.uiId
-                            ? {
-                                ...item,
-                                minReps: normalizeOptionalPositiveNumber(event.target.value),
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label>
-                  {copy.templateForm.maxReps}
-                  <input
-                    type="number"
-                    min={1}
-                    value={exercise.maxReps ?? ''}
-                    onChange={(event) =>
-                      updateDay(day.uiId, (current) => ({
-                        ...current,
-                        exercises: current.exercises.map((item) =>
-                          item.uiId === exercise.uiId
-                            ? {
-                                ...item,
-                                maxReps: normalizeOptionalPositiveNumber(event.target.value),
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-
-                <label>
-                  {copy.templateForm.restSec}
-                  <input
-                    type="number"
-                    min={15}
-                    value={exercise.restSecDefault ?? ''}
-                    onChange={(event) =>
-                      updateDay(day.uiId, (current) => ({
-                        ...current,
-                        exercises: current.exercises.map((item) =>
-                          item.uiId === exercise.uiId
-                            ? {
-                                ...item,
-                                restSecDefault: normalizeOptionalPositiveNumber(
-                                  event.target.value,
-                                ),
-                              }
-                            : item,
-                        ),
-                      }))
-                    }
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  className={styles.ghost}
-                  onClick={() =>
-                    updateDay(day.uiId, (current) => ({
-                      ...current,
-                      exercises: current.exercises.filter(
-                        (item) => item.uiId !== exercise.uiId,
-                      ),
-                    }))
-                  }
-                  disabled={day.exercises.length <= 1}
-                >
-                  {copy.templateForm.removeExercise}
-                </button>
-              </li>
+              <TemplateExerciseRow
+                key={exercise.uiId}
+                language={language}
+                exercise={exercise}
+                suggestions={exerciseSuggestions}
+                historyEntry={
+                  exercise.name.trim()
+                    ? historyLookup.get(normalizeExerciseName(exercise.name))
+                    : undefined
+                }
+                onChange={(exerciseUpdater) =>
+                  updateDay(day.uiId, (current) => ({
+                    ...current,
+                    exercises: current.exercises.map((item) =>
+                      item.uiId === exercise.uiId ? exerciseUpdater(item) : item,
+                    ),
+                  }))
+                }
+                onRemove={() =>
+                  updateDay(day.uiId, (current) => ({
+                    ...current,
+                    exercises: current.exercises.filter((item) => item.uiId !== exercise.uiId),
+                  }))
+                }
+                disableRemove={day.exercises.length <= 1}
+              />
             ))}
           </ul>
 

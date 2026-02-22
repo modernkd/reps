@@ -17,7 +17,7 @@
   align-items: center;
   gap: 0.55rem;
   border: 1px solid var(--ink-250);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   padding: 0.2rem;
   background: color-mix(in srgb, var(--surface-0) 90%, transparent);
   box-shadow: var(--shadow-1);
@@ -27,7 +27,7 @@
   flex: 0 0 2.6rem;
   width: 2.6rem;
   height: 2.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   border: 1px solid color-mix(in srgb, var(--ink-300) 62%, transparent);
   background: color-mix(in srgb, var(--surface-0) 88%, transparent);
   color: var(--ink-900);
@@ -128,5 +128,10 @@
   .inner {
     padding: 0.75rem 0.75rem 0.9rem;
     justify-content: center;
+  }
+
+  .iconButton {
+    width: 2.85rem;
+    height: 2.85rem;
   }
 }

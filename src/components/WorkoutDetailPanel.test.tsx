@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { WorkoutDetailPanel } from './WorkoutDetailPanel'
 
-function createProps() {
+function createProps(): ComponentProps<typeof WorkoutDetailPanel> {
   return {
     language: 'en' as const,
     date: '2026-02-10',
@@ -14,6 +15,8 @@ function createProps() {
     onCreate: vi.fn(),
     onPasteWorkout: vi.fn(),
     canPasteWorkout: false,
+    canClearBefore: true,
+    onClearBefore: vi.fn(),
     canClearAfter: true,
     onClearAfter: vi.fn(),
     onEdit: vi.fn(),
@@ -24,6 +27,8 @@ function createProps() {
     onSkipSession: vi.fn(),
     onPreviewSession: vi.fn(),
     onResetSession: vi.fn(),
+    canClearAllUncompleted: true,
+    onClearAllUncompleted: vi.fn(),
   }
 }
 
@@ -32,9 +37,18 @@ describe('WorkoutDetailPanel', () => {
     const props = createProps()
     render(<WorkoutDetailPanel {...props} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear after' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear uncompleted after' }))
 
     expect(props.onClearAfter).toHaveBeenCalledWith('2026-02-10')
+  })
+
+  it('requests clear-before with the selected date', () => {
+    const props = createProps()
+    render(<WorkoutDetailPanel {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear uncompleted before' }))
+
+    expect(props.onClearBefore).toHaveBeenCalledWith('2026-02-10')
   })
 
   it('disables clear-after button when no future records exist', () => {
@@ -42,7 +56,32 @@ describe('WorkoutDetailPanel', () => {
     props.canClearAfter = false
     render(<WorkoutDetailPanel {...props} />)
 
-    expect(screen.getByRole('button', { name: 'Clear after' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear uncompleted after' })).toBeDisabled()
+  })
+
+  it('disables clear-before button when no earlier records exist', () => {
+    const props = createProps()
+    props.canClearBefore = false
+    render(<WorkoutDetailPanel {...props} />)
+
+    expect(screen.getByRole('button', { name: 'Clear uncompleted before' })).toBeDisabled()
+  })
+
+  it('requests clear-all-uncompleted with the dedicated button', () => {
+    const props = createProps()
+    render(<WorkoutDetailPanel {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all uncompleted sessions' }))
+
+    expect(props.onClearAllUncompleted).toHaveBeenCalled()
+  })
+
+  it('disables clear-all-uncompleted button when no uncompleted sessions exist', () => {
+    const props = createProps()
+    props.canClearAllUncompleted = false
+    render(<WorkoutDetailPanel {...props} />)
+
+    expect(screen.getByRole('button', { name: 'Clear all uncompleted sessions' })).toBeDisabled()
   })
 
   it('shows estimated calories for completed workouts', () => {

@@ -4,6 +4,7 @@ import type { AppLanguage } from '@/lib/i18n'
 import { getCopy, localizeWorkoutTypeName } from '@/lib/i18n'
 import type { Workout, WorkoutIntensity, WorkoutType } from '@/lib/types'
 
+import ElasticSlider from './ElasticSlider'
 import styles from './styles/WorkoutForm.module.css'
 
 export type WorkoutFormValue = {
@@ -45,9 +46,7 @@ export function WorkoutForm({
 
   const [date, setDate] = useState(initialValue?.date ?? defaultDate)
   const [type, setType] = useState(initialValue?.type ?? defaultType)
-  const [durationMin, setDurationMin] = useState(
-    String(initialValue?.durationMin ?? 45),
-  )
+  const [durationMin, setDurationMin] = useState(initialValue?.durationMin ?? 45)
   const [targetWeightKg, setTargetWeightKg] = useState(
     initialValue?.targetWeightKg ? String(initialValue.targetWeightKg) : '',
   )
@@ -144,12 +143,25 @@ export function WorkoutForm({
 
       <label>
         {copy.form.duration}
+        <div className={styles.sliderField}>
+          <ElasticSlider
+            value={durationMin}
+            onChange={(value) => setDurationMin(value)}
+            startingValue={5}
+            maxValue={300}
+            isStepped
+            stepSize={5}
+            ariaLabel={copy.form.duration}
+            valueFormatter={(value) => `${Math.round(value)} min`}
+            leftIcon={<span aria-hidden>5</span>}
+            rightIcon={<span aria-hidden>300</span>}
+          />
+        </div>
         <input
-          type="number"
-          min={1}
-          step={1}
+          type="hidden"
+          name="durationMin"
           value={durationMin}
-          onChange={(event) => setDurationMin(event.target.value)}
+          readOnly
         />
         {errors.durationMin ? (
           <span className={styles.error}>{errors.durationMin}</span>

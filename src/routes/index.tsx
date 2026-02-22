@@ -9,6 +9,7 @@ import { AppFooterControls } from '@/components/AppFooterControls'
 import { AppHeader } from '@/components/AppHeader'
 import { CalendarView } from '@/components/CalendarView'
 import { FilterBar } from '@/components/FilterBar'
+import { ExerciseHistoryView, type ExerciseViewFilters } from '@/components/ExerciseHistoryView'
 import { GraphView } from '@/components/GraphView'
 import { GuidedWorkoutView } from '@/components/GuidedWorkoutView'
 import { Modal } from '@/components/Modal'
@@ -17,27 +18,39 @@ import { TemplateEditor, createDefaultTemplateDays } from '@/components/Template
 import { WorkoutDetailPanel } from '@/components/WorkoutDetailPanel'
 import { WorkoutForm, type WorkoutFormValue } from '@/components/WorkoutForm'
 import {
+  addExerciseCatalogEntry,
   activeSessionDraftsCollection,
-  addWorkout,
+  applyTemplateToCalendar,
   beginGuidedSession,
+  clearAllUncompletedSessions,
   completeGuidedSession,
   clearDataAfterDate,
+  clearDataBeforeDate,
   createPlanTemplate,
+  deletePlanTemplate,
   deleteWorkout,
   ensureDefaultWorkoutTypes,
+  ensureDefaultExerciseCatalog,
+  exerciseCatalogCollection,
   exerciseTemplatesCollection,
   generateScheduleForRange,
   getOrCreateSessionPlan,
   importStarterTemplate,
+  LAST_TEMPLATE_DELETE_ERROR,
+  MIN_TEMPLATE_COUNT,
   planDaysCollection,
   planTemplatesCollection,
+  MANUAL_TEMPLATE_ID,
   resetCompletedSession,
   saveGuidedSessionDraft,
   scheduledSessionsCollection,
   sessionPlansCollection,
   skipScheduledSession,
   moveScheduledSessionToDate,
+  duplicateScheduledSession,
+  planManualWorkout,
   updateSessionPlan,
+  updatePlanTemplate,
   updateWorkout,
   workoutTypesCollection,
   workoutsCollection,
@@ -48,6 +61,8 @@ import { sendSkippedWorkoutNotification } from '@/lib/notifications'
 import {
   getCalendarMonthModel,
   getDefaultMonth,
+  getExerciseHistory,
+  getLatestWeightByExerciseName,
   getWeeklyTrendSeries,
   monthRange,
 } from '@/lib/selectors'
@@ -58,10 +73,16 @@ import type { ActiveSessionDraft, SessionPlan, Workout } from '@/lib/types'
 
 import styles from './index.module.css'
 
+type DashboardView = 'calendar' | 'graph' | 'exercises'
+
 const searchSchema = z.object({
-  view: z.enum(['calendar', 'graph']).optional(),
+  view: z.enum(['calendar', 'graph', 'exercises', 'history']).optional(),
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   types: z.string().optional(),
+  exMuscle: z.string().optional(),
+  exEquipment: z.string().optional(),
+  exDifficulty: z.string().optional(),
+  exCategory: z.string().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   session: z.string().optional(),
   template: z.string().optional(),
@@ -130,6 +151,7 @@ function WorkoutDashboard() {
   const templatesQuery = useLiveQuery(planTemplatesCollection)
   const planDaysQuery = useLiveQuery(planDaysCollection)
   const exerciseQuery = useLiveQuery(exerciseTemplatesCollection)
+  const exerciseCatalogQuery = useLiveQuery(exerciseCatalogCollection)
   const sessionsQuery = useLiveQuery(scheduledSessionsCollection)
   const draftQuery = useLiveQuery(activeSessionDraftsCollection)
   const sessionPlansQuery = useLiveQuery(sessionPlansCollection)
@@ -139,19 +161,65 @@ function WorkoutDashboard() {
   const templates = templatesQuery.data ?? []
   const planDays = planDaysQuery.data ?? []
   const exercises = exerciseQuery.data ?? []
+  const exerciseCatalog = exerciseCatalogQuery.data ?? []
   const sessions = sessionsQuery.data ?? []
   const drafts = (draftQuery.data ?? []) as ActiveSessionDraft[]
   const sessionPlans = (sessionPlansQuery.data ?? []) as SessionPlan[]
 
   const month = search.month ?? getDefaultMonth(workouts)
   const selectedDate = search.date ?? todayIso()
-  const view = search.view ?? 'calendar'
+  const view = (search.view === 'history' ? 'exercises' : search.view ?? 'calendar') as DashboardView
   const selectedTypeIds = useMemo(
     () => (search.types ? search.types.split(',').filter(Boolean) : []),
     [search.types],
   )
+  const selectedExerciseFilters = useMemo<ExerciseViewFilters>(
+    () => ({
+      muscle: search.exMuscle,
+      equipment: search.exEquipment,
+      difficulty: search.exDifficulty,
+      category: search.exCategory,
+    }),
+    [search.exCategory, search.exDifficulty, search.exEquipment, search.exMuscle],
+  )
   const setSearch = (updater: (prev: typeof search) => typeof search) => {
-    navigate({ search: updater })
+    navigate({
+      search: (prev) => {
+        const next = updater(prev)
+        const normalizedView = next.view === 'history' ? 'exercises' : next.view
+
+        if (normalizedView === 'exercises') {
+          return {
+            view: 'exercises',
+            types: next.types || undefined,
+            exMuscle: next.exMuscle || undefined,
+            exEquipment: next.exEquipment || undefined,
+            exDifficulty: next.exDifficulty || undefined,
+            exCategory: next.exCategory || undefined,
+          }
+        }
+
+        if (normalizedView === 'graph') {
+          return {
+            view: 'graph',
+            month: next.month,
+            types: next.types || undefined,
+          }
+        }
+
+        const calendarMonth = next.month ?? getDefaultMonth(workouts)
+        const calendarDate = next.date ?? todayIso()
+
+        return {
+          view: undefined,
+          month: calendarMonth === getDefaultMonth(workouts) ? undefined : calendarMonth,
+          date: calendarDate === todayIso() ? undefined : calendarDate,
+          types: next.types || undefined,
+          session: next.session,
+          template: next.template,
+        }
+      },
+    })
   }
 
   const [modalState, setModalState] = useState<
@@ -160,14 +228,20 @@ function WorkoutDashboard() {
     | null
   >(null)
   const [templateModalState, setTemplateModalState] = useState<
+    | { mode: 'create'; startDate: string }
     | {
+        mode: 'duplicate'
         sourceTemplateId?: string
         startDate: string
         allowSourceSelection: boolean
-        duplicateIntent: boolean
       }
+    | { mode: 'edit'; templateId: string }
     | null
   >(null)
+  const [applyTemplateModalState, setApplyTemplateModalState] = useState<{
+    startPlanDayId: string
+  } | null>(null)
+  const [isApplyingTemplate, setIsApplyingTemplate] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [language, setLanguage] = useState<AppLanguage>(() => getPreferredLanguage())
   const copy = getCopy(language)
@@ -175,6 +249,7 @@ function WorkoutDashboard() {
   const [themeReady, setThemeReady] = useState(false)
   const [previewSessionId, setPreviewSessionId] = useState<string | null>(null)
   const [copiedWorkout, setCopiedWorkout] = useState<{
+    scheduledSessionId?: string
     type: string
     durationMin: number
     targetWeightKg?: number
@@ -182,6 +257,7 @@ function WorkoutDashboard() {
     intensity?: 'low' | 'medium' | 'high'
     notes?: string
   } | null>(null)
+  const isSavingTemplateRef = useRef(false)
 
   const viewRef = useRef<HTMLDivElement | null>(null)
 
@@ -200,13 +276,25 @@ function WorkoutDashboard() {
     )
   }, [search.template, templates])
   const activeTemplate = templates.find((template) => template.id === activeTemplateId)
-  const visibleSessions = useMemo(
+  const activeTemplateDays = useMemo(
     () =>
       activeTemplateId
-        ? sessions.filter((session) => session.templateId === activeTemplateId)
-        : sessions,
-    [activeTemplateId, sessions],
+        ? planDays
+            .filter((day) => day.templateId === activeTemplateId)
+            .sort((a, b) => a.weekday - b.weekday)
+        : [],
+    [activeTemplateId, planDays],
   )
+  const visibleSessions = useMemo(() => {
+    if (!activeTemplateId) {
+      return sessions
+    }
+
+    return sessions.filter(
+      (session) =>
+        session.templateId === activeTemplateId || session.templateId === MANUAL_TEMPLATE_ID,
+    )
+  }, [activeTemplateId, sessions])
 
   const calendarModel = useMemo(
     () =>
@@ -223,9 +311,21 @@ function WorkoutDashboard() {
     calendarModel.find((day) => day.date === selectedDate) ?? calendarModel[0]
   const canClearAfter = useMemo(
     () =>
-      workouts.some((workout) => workout.date > selectedDate) ||
-      visibleSessions.some((session) => session.date > selectedDate),
-    [selectedDate, visibleSessions, workouts],
+      visibleSessions.some(
+        (session) => session.status !== 'completed' && session.date > selectedDate,
+      ),
+    [selectedDate, visibleSessions],
+  )
+  const canClearBefore = useMemo(
+    () =>
+      visibleSessions.some(
+        (session) => session.status !== 'completed' && session.date < selectedDate,
+      ),
+    [selectedDate, visibleSessions],
+  )
+  const canClearAllUncompleted = useMemo(
+    () => sessions.some((session) => session.status !== 'completed'),
+    [sessions],
   )
 
   const weeklySeries = useMemo(
@@ -252,6 +352,7 @@ function WorkoutDashboard() {
   const activeSessionPlan = activeSession
     ? sessionPlans.find((plan) => plan.sessionId === activeSession.id)
     : undefined
+  const isWorkoutMode = search.session !== undefined
 
   const activeExercises = activeSessionPlan
     ? activeSessionPlan.exercises.map((exercise) => ({
@@ -262,12 +363,56 @@ function WorkoutDashboard() {
       ? exercises.filter((exercise) => exercise.planDayId === activePlanDay.id)
       : []
 
+  const exerciseHistory = useMemo(() => getExerciseHistory(workouts), [workouts])
+  const latestWeightByExerciseName = useMemo(
+    () => getLatestWeightByExerciseName(workouts),
+    [workouts],
+  )
+  const templateExerciseSuggestions = useMemo(() => {
+    const names = new Set<string>()
+
+    for (const entry of exerciseCatalog) {
+      const trimmed = entry.name.trim()
+      if (trimmed) {
+        names.add(trimmed)
+      }
+    }
+
+    for (const exercise of exercises) {
+      const trimmed = exercise.name.trim()
+      if (trimmed) {
+        names.add(trimmed)
+      }
+    }
+
+    for (const plan of sessionPlans) {
+      for (const exercise of plan.exercises) {
+        const trimmed = exercise.name.trim()
+        if (trimmed) {
+          names.add(trimmed)
+        }
+      }
+    }
+
+    for (const entry of exerciseHistory) {
+      names.add(entry.name)
+    }
+
+    return [...names].sort((a, b) => a.localeCompare(b))
+  }, [exerciseCatalog, exerciseHistory, exercises, sessionPlans])
+
   const previewPlan = previewSessionId
     ? sessionPlans.find((plan) => plan.sessionId === previewSessionId)
     : undefined
 
   useEffect(() => {
     ensureDefaultWorkoutTypes().catch(() => {
+      setErrorMessage(copy.route.failedInitTypes)
+    })
+  }, [copy.route.failedInitTypes])
+
+  useEffect(() => {
+    ensureDefaultExerciseCatalog().catch(() => {
       setErrorMessage(copy.route.failedInitTypes)
     })
   }, [copy.route.failedInitTypes])
@@ -330,42 +475,46 @@ function WorkoutDashboard() {
 
   useEffect(() => {
     if (!reducedMotion && viewRef.current) {
+      const offset = view === 'graph' || view === 'exercises' ? 16 : -16
       gsap.fromTo(
         viewRef.current,
-        { autoAlpha: 0, x: view === 'graph' ? 16 : -16 },
+        { autoAlpha: 0, x: offset },
         { autoAlpha: 1, x: 0, duration: 0.32, ease: 'power2.out' },
       )
     }
   }, [view, reducedMotion])
 
   useEffect(() => {
-    if (!search.month) {
-      navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, month }),
-      })
-    }
-  }, [month, navigate, search.month])
-
-  useEffect(() => {
-    if (!search.date) {
-      navigate({
-        replace: true,
-        search: (prev) => ({ ...prev, date: selectedDate }),
-      })
-    }
-  }, [navigate, search.date, selectedDate])
-
-  useEffect(() => {
-    if (!activeTemplateId || search.template === activeTemplateId) {
+    if (search.view !== 'history') {
       return
     }
 
-    navigate({
-      replace: true,
-      search: (prev) => ({ ...prev, template: activeTemplateId }),
-    })
-  }, [activeTemplateId, navigate, search.template])
+    setSearch((prev) => ({ ...prev, view: 'exercises' }))
+  }, [search.view])
+
+  useEffect(() => {
+    if (view !== 'exercises') {
+      return
+    }
+
+    if (!search.month && !search.date && !search.template && !search.session) {
+      return
+    }
+
+    setSearch((prev) => ({ ...prev, view: 'exercises' }))
+  }, [search.date, search.month, search.session, search.template, view])
+
+  useEffect(() => {
+    if (view !== 'graph') {
+      return
+    }
+
+    if (!search.date && !search.template && !search.session) {
+      return
+    }
+
+    setSearch((prev) => ({ ...prev, view: 'graph' }))
+  }, [search.date, search.session, search.template, view])
 
   useEffect(() => {
     if (!activeTemplate || selectedDate >= activeTemplate.startDate) {
@@ -392,11 +541,14 @@ function WorkoutDashboard() {
     setSearch((prev) => ({ ...prev, session: undefined }))
   }, [activeTemplateId, search.session, sessions])
 
-  const handleChangeView = (nextView: 'calendar' | 'graph') => {
+  const handleChangeView = (nextView: DashboardView) => {
     setSearch((prev) => ({ ...prev, view: nextView }))
 
     if (nextView === 'graph') {
       trackEvent('graph_view_opened', { month })
+    }
+    if (nextView === 'exercises') {
+      trackEvent('exercises_view_opened', { month })
     }
   }
 
@@ -413,6 +565,24 @@ function WorkoutDashboard() {
     const encoded = nextTypeIds.length > 0 ? nextTypeIds.sort().join(',') : undefined
     setSearch((prev) => ({ ...prev, types: encoded }))
     trackEvent('filter_used', { typeIds: nextTypeIds })
+  }
+
+  const handleExerciseFilterChange = (nextFilters: ExerciseViewFilters) => {
+    setSearch((prev) => ({
+      ...prev,
+      exMuscle: nextFilters.muscle || undefined,
+      exEquipment: nextFilters.equipment || undefined,
+      exDifficulty: nextFilters.difficulty || undefined,
+      exCategory: nextFilters.category || undefined,
+    }))
+  }
+
+  const handleAddExerciseCatalogEntry = async (name: string) => {
+    try {
+      await addExerciseCatalogEntry(name)
+    } catch {
+      setErrorMessage(copy.route.saveWorkoutError)
+    }
   }
 
   const getTemplateDaysForEditor = (templateId: string) => {
@@ -439,22 +609,121 @@ function WorkoutDashboard() {
     setSearch((prev) => ({ ...prev, template: templateId, session: undefined }))
   }
 
-  const handleOpenCreateTemplate = () => {
-    setTemplateModalState({
-      sourceTemplateId: activeTemplateId,
-      startDate: selectedDate,
-      allowSourceSelection: false,
-      duplicateIntent: false,
+  const handleOpenApplyTemplate = () => {
+    if (activeTemplateDays.length === 0) {
+      setErrorMessage(copy.route.failedGenerateSessions)
+      return
+    }
+
+    const selectedWeekday = ((parseISO(selectedDate).getDay() + 6) % 7) + 1
+    const preferredDay =
+      activeTemplateDays.find((day) => day.weekday === selectedWeekday) ??
+      activeTemplateDays[0]
+
+    setApplyTemplateModalState({
+      startPlanDayId: preferredDay!.id,
     })
   }
 
-  const handleOpenDuplicateTemplate = () => {
+  const handleApplyTemplate = async () => {
+    if (!activeTemplateId || !applyTemplateModalState || isApplyingTemplate) {
+      return
+    }
+
+    setErrorMessage(null)
+    setIsApplyingTemplate(true)
+
+    try {
+      const targetMonth = selectedDate.slice(0, 7)
+      const range = monthRange(targetMonth)
+
+      await applyTemplateToCalendar({
+        templateId: activeTemplateId,
+        startDate: selectedDate,
+        to: range.to,
+        startPlanDayId: applyTemplateModalState.startPlanDayId,
+      })
+
+      setApplyTemplateModalState(null)
+      setSearch((prev) => ({
+        ...prev,
+        month: targetMonth,
+        date: selectedDate,
+        session: undefined,
+      }))
+
+      trackEvent('template_applied', {
+        templateId: activeTemplateId,
+        date: selectedDate,
+        startPlanDayId: applyTemplateModalState.startPlanDayId,
+      })
+    } catch {
+      setErrorMessage(copy.route.failedGenerateSessions)
+    } finally {
+      setIsApplyingTemplate(false)
+    }
+  }
+
+  const handleOpenCreateTemplate = () => {
     setTemplateModalState({
-      sourceTemplateId: activeTemplateId,
+      mode: 'create',
+      startDate: selectedDate,
+    })
+  }
+
+  const handleOpenDuplicateTemplate = (sourceTemplateId?: string) => {
+    setTemplateModalState({
+      mode: 'duplicate',
+      sourceTemplateId: sourceTemplateId ?? activeTemplateId,
       startDate: selectedDate,
       allowSourceSelection: true,
-      duplicateIntent: true,
     })
+  }
+
+  const handleOpenEditTemplate = (templateId?: string) => {
+    const targetTemplateId = templateId ?? activeTemplateId
+    if (!targetTemplateId) {
+      return
+    }
+
+    setTemplateModalState({
+      mode: 'edit',
+      templateId: targetTemplateId,
+    })
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    const target = templates.find((template) => template.id === templateId)
+    if (!target) {
+      return
+    }
+
+    if (templates.length <= MIN_TEMPLATE_COUNT) {
+      setErrorMessage(copy.route.minTemplatesRequired)
+      return
+    }
+
+    const confirmed = window.confirm(copy.route.confirmDeleteTemplate(target.name))
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await deletePlanTemplate(templateId)
+      setSearch((prev) => ({
+        ...prev,
+        template: prev.template === templateId ? undefined : prev.template,
+        session: undefined,
+      }))
+      trackEvent('template_deleted', { templateId })
+    } catch (error) {
+      if (error instanceof Error && error.message === LAST_TEMPLATE_DELETE_ERROR) {
+        setErrorMessage(copy.route.minTemplatesRequired)
+        return
+      }
+
+      setErrorMessage(copy.route.deleteTemplateError)
+    }
   }
 
   const handleOpenCreate = (date = selectedDate) => {
@@ -472,7 +741,7 @@ function WorkoutDashboard() {
       if (modalState?.mode === 'edit') {
         await updateWorkout(modalState.workout.id, value)
       } else {
-        await addWorkout(value)
+        await planManualWorkout(value)
       }
 
       trackEvent('workout_save_success', { mode: modalState?.mode ?? 'create' })
@@ -530,8 +799,76 @@ function WorkoutDashboard() {
     }
   }
 
+  const handleClearBefore = async (date: string) => {
+    const confirmed = window.confirm(copy.route.confirmClearBeforeDate(date))
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const { sessionsDeleted, workoutsDeleted } = await clearDataBeforeDate(date)
+      const selectedSession = search.session
+        ? sessions.find((session) => session.id === search.session)
+        : undefined
+      const previewSession = previewSessionId
+        ? sessions.find((session) => session.id === previewSessionId)
+        : undefined
+
+      if (selectedSession && selectedSession.date < date) {
+        setSearch((prev) => ({ ...prev, session: undefined }))
+      }
+
+      if (previewSession && previewSession.date < date) {
+        setPreviewSessionId(null)
+      }
+
+      trackEvent('clear_before_selected_day', {
+        date,
+        sessionsDeleted,
+        workoutsDeleted,
+      })
+    } catch {
+      setErrorMessage(copy.route.clearBeforeDateError)
+    }
+  }
+
+  const handleClearAllUncompleted = async () => {
+    setErrorMessage(null)
+
+    const confirmed = window.confirm(copy.route.confirmClearAllUncompleted)
+    if (!confirmed) {
+      return
+    }
+
+    const selectedSession = search.session
+      ? sessions.find((session) => session.id === search.session)
+      : undefined
+    const previewSession = previewSessionId
+      ? sessions.find((session) => session.id === previewSessionId)
+      : undefined
+
+    try {
+      const { sessionsDeleted } = await clearAllUncompletedSessions()
+
+      if (selectedSession && selectedSession.status !== 'completed') {
+        setSearch((prev) => ({ ...prev, session: undefined }))
+      }
+
+      if (previewSession && previewSession.status !== 'completed') {
+        setPreviewSessionId(null)
+      }
+
+      trackEvent('clear_all_uncompleted_sessions', {
+        sessionsDeleted,
+      })
+    } catch {
+      setErrorMessage(copy.route.clearAllUncompletedError)
+    }
+  }
+
   const handleCopyWorkout = (workout: Workout) => {
     setCopiedWorkout({
+      scheduledSessionId: workout.scheduledSessionId,
       type: workout.type,
       durationMin: workout.durationMin,
       targetWeightKg: workout.targetWeightKg,
@@ -548,15 +885,19 @@ function WorkoutDashboard() {
     }
 
     try {
-      await addWorkout({
-        date,
-        type: copiedWorkout.type,
-        durationMin: copiedWorkout.durationMin,
-        targetWeightKg: copiedWorkout.targetWeightKg,
-        distanceKm: copiedWorkout.distanceKm,
-        intensity: copiedWorkout.intensity,
-        notes: copiedWorkout.notes,
-      })
+      if (copiedWorkout.scheduledSessionId) {
+        await duplicateScheduledSession(copiedWorkout.scheduledSessionId, date)
+      } else {
+        await planManualWorkout({
+          date,
+          type: copiedWorkout.type,
+          durationMin: copiedWorkout.durationMin,
+          targetWeightKg: copiedWorkout.targetWeightKg,
+          distanceKm: copiedWorkout.distanceKm,
+          intensity: copiedWorkout.intensity,
+          notes: copiedWorkout.notes,
+        })
+      }
       setSearch((prev) => ({ ...prev, date }))
     } catch {
       setErrorMessage(copy.route.pasteWorkoutError)
@@ -567,15 +908,19 @@ function WorkoutDashboard() {
     const nextWeekDate = addDaysIso(workout.date, 7)
 
     try {
-      await addWorkout({
-        date: nextWeekDate,
-        type: workout.type,
-        durationMin: workout.durationMin,
-        targetWeightKg: workout.targetWeightKg,
-        distanceKm: workout.distanceKm,
-        intensity: workout.intensity,
-        notes: workout.notes,
-      })
+      if (workout.scheduledSessionId) {
+        await duplicateScheduledSession(workout.scheduledSessionId, nextWeekDate)
+      } else {
+        await planManualWorkout({
+          date: nextWeekDate,
+          type: workout.type,
+          durationMin: workout.durationMin,
+          targetWeightKg: workout.targetWeightKg,
+          distanceKm: workout.distanceKm,
+          intensity: workout.intensity,
+          notes: workout.notes,
+        })
+      }
       setSearch((prev) => ({ ...prev, date: nextWeekDate }))
       trackEvent('workout_copied_to_next_week', { workoutId: workout.id })
     } catch {
@@ -601,45 +946,85 @@ function WorkoutDashboard() {
     if (!templateModalState) {
       return
     }
+    if (isSavingTemplateRef.current) {
+      return
+    }
 
     setErrorMessage(null)
+    isSavingTemplateRef.current = true
 
     try {
-      const template = await createPlanTemplate({
-        name: value.name,
-        startDate: value.startDate,
-        locale: language,
-        days: value.days,
-      })
+      if (templateModalState.mode === 'edit') {
+        await updatePlanTemplate({
+          templateId: templateModalState.templateId,
+          name: value.name,
+          startDate: value.startDate,
+          locale: language,
+          days: value.days,
+        })
 
-      const range = monthRange(month)
-      await generateScheduleForRange({
-        templateId: template.id,
-        from: range.from,
-        to: range.to,
-      })
+        const range = monthRange(month)
+        await generateScheduleForRange({
+          templateId: templateModalState.templateId,
+          from: range.from,
+          to: range.to,
+        })
 
-      setTemplateModalState(null)
-      setSearch((prev) => ({
-        ...prev,
-        template: template.id,
-        date: value.startDate,
-        month: value.startDate.slice(0, 7),
-        session: undefined,
-      }))
+        setTemplateModalState(null)
+        setSearch((prev) => ({
+          ...prev,
+          template: templateModalState.templateId,
+          date: value.startDate,
+          month: value.startDate.slice(0, 7),
+          session: undefined,
+        }))
 
-      trackEvent(
-        templateModalState.duplicateIntent ? 'template_duplicated' : 'template_created',
-        {
-        templateId: template.id,
-        },
-      )
+        trackEvent('template_updated', {
+          templateId: templateModalState.templateId,
+        })
+      } else {
+        const template = await createPlanTemplate({
+          name: value.name,
+          startDate: value.startDate,
+          locale: language,
+          days: value.days,
+        })
+
+        const range = monthRange(month)
+        await generateScheduleForRange({
+          templateId: template.id,
+          from: range.from,
+          to: range.to,
+        })
+
+        setTemplateModalState(null)
+        setSearch((prev) => ({
+          ...prev,
+          template: template.id,
+          date: value.startDate,
+          month: value.startDate.slice(0, 7),
+          session: undefined,
+        }))
+
+        trackEvent(
+          templateModalState.mode === 'duplicate'
+            ? 'template_duplicated'
+            : 'template_created',
+          {
+            templateId: template.id,
+          },
+        )
+      }
     } catch {
       setErrorMessage(
-        templateModalState.duplicateIntent
+        templateModalState.mode === 'duplicate'
           ? copy.route.duplicateTemplateError
-          : copy.route.createTemplateError,
+          : templateModalState.mode === 'edit'
+            ? copy.route.updateTemplateError
+            : copy.route.createTemplateError,
       )
+    } finally {
+      isSavingTemplateRef.current = false
     }
   }
 
@@ -778,17 +1163,32 @@ function WorkoutDashboard() {
     }))
   }
 
-  const templateSource = templateModalState?.sourceTemplateId
-    ? templates.find((template) => template.id === templateModalState.sourceTemplateId)
-    : undefined
+  const templateSource =
+    templateModalState?.mode === 'duplicate' && templateModalState.sourceTemplateId
+      ? templates.find((template) => template.id === templateModalState.sourceTemplateId)
+      : templateModalState?.mode === 'edit'
+        ? templates.find((template) => template.id === templateModalState.templateId)
+        : undefined
 
   const templateEditorInitialName =
-    templateSource ? `${templateSource.name} copy` : ''
-  const templateEditorInitialStartDate = templateModalState?.startDate ?? selectedDate
+    templateModalState?.mode === 'edit'
+      ? templateSource?.name ?? ''
+      : templateSource
+        ? `${templateSource.name} copy`
+        : ''
+  const templateEditorInitialStartDate =
+    templateModalState?.mode === 'edit'
+      ? templateSource?.startDate ?? selectedDate
+      : templateModalState?.startDate ?? selectedDate
   const templateEditorInitialDays =
-    templateSource
-      ? getTemplateDaysForEditor(templateSource.id)
-      : createDefaultTemplateDays()
+    templateSource ? getTemplateDaysForEditor(templateSource.id) : createDefaultTemplateDays()
+  const applyTemplateDayOptions = activeTemplateDays.map((day, index) => ({
+    id: day.id,
+    label:
+      day.label.trim() ||
+      `${copy.templateForm.dayLabel} ${index + 1}`,
+    weekdayLabel: copy.calendar.weekdayLabels[day.weekday - 1] ?? '',
+  }))
 
   const showLoading =
     workoutsQuery.isLoading ||
@@ -797,93 +1197,121 @@ function WorkoutDashboard() {
     sessionsQuery.isLoading ||
     planDaysQuery.isLoading ||
     exerciseQuery.isLoading ||
+    exerciseCatalogQuery.isLoading ||
     sessionPlansQuery.isLoading
 
   return (
     <main className={styles.page}>
       <div className={styles.container}>
-        <AppHeader
-          view={view}
-          language={language}
-          templates={templates.map((template) => ({
-            id: template.id,
-            name: template.name,
-          }))}
-          activeTemplateId={activeTemplateId}
-          onViewChange={handleChangeView}
-          onTemplateChange={handleTemplateChange}
-          onOpenCreateTemplate={handleOpenCreateTemplate}
-          onOpenDuplicateTemplate={handleOpenDuplicateTemplate}
-          onOpenCreateWorkout={() => handleOpenCreate(selectedDate)}
-        />
+        {!isWorkoutMode ? (
+          <AppHeader
+            view={view}
+            language={language}
+            templates={templates.map((template) => ({
+              id: template.id,
+              name: template.name,
+            }))}
+            activeTemplateId={activeTemplateId}
+            onViewChange={handleChangeView}
+            onTemplateChange={handleTemplateChange}
+            onApplyTemplateToCalendar={handleOpenApplyTemplate}
+            onOpenCreateTemplate={handleOpenCreateTemplate}
+            onOpenEditTemplate={handleOpenEditTemplate}
+            onOpenDuplicateTemplate={handleOpenDuplicateTemplate}
+            onDeleteTemplate={handleDeleteTemplate}
+            onOpenCreateWorkout={() => handleOpenCreate(selectedDate)}
+          />
+        ) : null}
 
-        <FilterBar
-          language={language}
-          selectedTypeIds={selectedTypeIds}
-          types={workoutTypes}
-          onChange={handleFilterChange}
-        />
+        {!isWorkoutMode ? (
+          <FilterBar
+            language={language}
+            selectedTypeIds={selectedTypeIds}
+            types={workoutTypes}
+            onChange={handleFilterChange}
+          />
+        ) : null}
 
         {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
         {showLoading ? <p className={styles.loading}>{copy.route.loadingWorkouts}</p> : null}
 
-        <div className={styles.main} ref={viewRef}>
-          {view === 'calendar' ? (
-            <div className={styles.calendarLayout}>
-              <CalendarView
-                language={language}
-                month={month}
-                model={calendarModel}
-                selectedDate={selectedDate}
-                onDaySelect={(date) => setSearch((prev) => ({ ...prev, date }))}
-                onMonthChange={handleMonthChange}
-              />
-
-              {selectedDay ? (
-                <WorkoutDetailPanel
+        {!isWorkoutMode ? (
+          <div className={styles.main} ref={viewRef}>
+            {view === 'calendar' ? (
+              <div className={styles.calendarLayout}>
+                <CalendarView
                   language={language}
-                  date={selectedDay.date}
-                  workouts={selectedDay.workouts}
-                  scheduledSessions={selectedDay.sessions}
-                  workoutTypes={workoutTypes}
-                  planDays={planDays}
-                  onCreate={handleOpenCreate}
-                  onPasteWorkout={handlePasteWorkout}
-                  canPasteWorkout={copiedWorkout !== null}
-                  canClearAfter={canClearAfter}
-                  onClearAfter={handleClearAfter}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onCopyWorkout={handleCopyWorkout}
-                  onCopyToNextWeek={handleCopyToNextWeek}
-                  onStartWorkout={handleStartSession}
-                  onSkipSession={handleSkipSession}
-                  onPreviewSession={handlePreviewSession}
-                  onResetSession={handleResetSession}
+                  month={month}
+                  model={calendarModel}
+                  selectedDate={selectedDate}
+                  onDaySelect={(date) => setSearch((prev) => ({ ...prev, date }))}
+                  onMonthChange={handleMonthChange}
                 />
-              ) : (
-                <section className={styles.emptyState}>{copy.route.selectDate}</section>
-              )}
-            </div>
-          ) : (
-            <div className={styles.fullWidth}>
-              <GraphView
-                language={language}
-                series={weeklySeries}
-                workouts={workouts}
-                workoutTypes={workoutTypes}
-                selectedTypeIds={selectedTypeIds}
-                onPointSelect={(weekStart) => {
-                  const targetDate = toDateIso(parseISO(weekStart))
-                  setSearch((prev) => ({ ...prev, date: targetDate, view: 'calendar' }))
-                }}
-              />
-            </div>
-          )}
-        </div>
+
+                {selectedDay ? (
+                  <WorkoutDetailPanel
+                    language={language}
+                    date={selectedDay.date}
+                    workouts={selectedDay.workouts}
+                    scheduledSessions={selectedDay.sessions}
+                    workoutTypes={workoutTypes}
+                    planDays={planDays}
+                    onCreate={handleOpenCreate}
+                    onPasteWorkout={handlePasteWorkout}
+                    canPasteWorkout={copiedWorkout !== null}
+                    canClearBefore={canClearBefore}
+                    onClearBefore={handleClearBefore}
+                    canClearAfter={canClearAfter}
+                    onClearAfter={handleClearAfter}
+                    canClearAllUncompleted={canClearAllUncompleted}
+                    onClearAllUncompleted={handleClearAllUncompleted}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onCopyWorkout={handleCopyWorkout}
+                    onCopyToNextWeek={handleCopyToNextWeek}
+                    onStartWorkout={handleStartSession}
+                    onSkipSession={handleSkipSession}
+                    onPreviewSession={handlePreviewSession}
+                    onResetSession={handleResetSession}
+                  />
+                ) : (
+                  <section className={styles.emptyState}>{copy.route.selectDate}</section>
+                )}
+              </div>
+            ) : view === 'graph' ? (
+              <div className={styles.fullWidth}>
+                <GraphView
+                  language={language}
+                  series={weeklySeries}
+                  workouts={workouts}
+                  workoutTypes={workoutTypes}
+                  selectedTypeIds={selectedTypeIds}
+                  onPointSelect={(weekStart) => {
+                    const targetDate = toDateIso(parseISO(weekStart))
+                    setSearch((prev) => ({ ...prev, date: targetDate, view: 'calendar' }))
+                  }}
+                />
+              </div>
+            ) : (
+              <div className={styles.fullWidth}>
+                <ExerciseHistoryView
+                  language={language}
+                  workouts={workouts}
+                  selectedTypeIds={selectedTypeIds}
+                  selectedFilters={selectedExerciseFilters}
+                  onFiltersChange={handleExerciseFilterChange}
+                  availableExerciseNames={templateExerciseSuggestions}
+                  onAddExercise={handleAddExerciseCatalogEntry}
+                />
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {activeSession && activeDraft ? (
-          <section className={styles.floatingCard}>
+          <section
+            className={isWorkoutMode ? styles.workoutModeSurface : styles.floatingCard}
+          >
             <GuidedWorkoutView
               language={language}
               session={activeSession}
@@ -894,12 +1322,15 @@ function WorkoutDashboard() {
               onComplete={handleCompleteSession}
               onAbort={handleAbortSession}
               onSwapExerciseVariant={handleSwapExerciseVariant}
+              latestWeightByExerciseName={latestWeightByExerciseName}
             />
           </section>
         ) : null}
 
         {search.session && !activeDraft ? (
-          <section className={styles.error}>{copy.route.guidedNotReady}</section>
+          <section className={isWorkoutMode ? styles.workoutModeError : styles.error}>
+            {copy.route.guidedNotReady}
+          </section>
         ) : null}
 
         {workouts.length === 0 && visibleSessions.length === 0 ? (
@@ -909,12 +1340,14 @@ function WorkoutDashboard() {
         ) : null}
       </div>
 
-      <AppFooterControls
-        language={language}
-        theme={theme}
-        onLanguageChange={setLanguage}
-        onToggleTheme={handleToggleTheme}
-      />
+      {!isWorkoutMode ? (
+        <AppFooterControls
+          language={language}
+          theme={theme}
+          onLanguageChange={setLanguage}
+          onToggleTheme={handleToggleTheme}
+        />
+      ) : null}
 
       <Modal
         title={
@@ -939,21 +1372,73 @@ function WorkoutDashboard() {
       </Modal>
 
       <Modal
-        title={copy.route.createTemplateTitle}
+        title={copy.route.applyTemplateTitle}
+        isOpen={applyTemplateModalState !== null}
+        onClose={() => setApplyTemplateModalState(null)}
+        closeLabel={copy.common.close}
+      >
+        {applyTemplateModalState ? (
+          <>
+            <p>{copy.route.applyTemplateHelp(selectedDate)}</p>
+            <label>
+              {copy.route.applyTemplateStartDayLabel}
+              <select
+                value={applyTemplateModalState.startPlanDayId}
+                onChange={(event) =>
+                  setApplyTemplateModalState((current) =>
+                    current
+                      ? {
+                          ...current,
+                          startPlanDayId: event.target.value,
+                        }
+                      : current,
+                  )
+                }
+              >
+                {applyTemplateDayOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label} ({option.weekdayLabel})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div>
+              <button
+                type="button"
+                onClick={handleApplyTemplate}
+                disabled={isApplyingTemplate}
+              >
+                {copy.route.applyTemplateAction}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </Modal>
+
+      <Modal
+        title={
+          templateModalState?.mode === 'duplicate'
+            ? copy.route.duplicateTemplateTitle
+            : templateModalState?.mode === 'edit'
+              ? copy.route.editTemplateTitle
+              : copy.route.createTemplateTitle
+        }
         isOpen={templateModalState !== null}
         onClose={() => setTemplateModalState(null)}
         closeLabel={copy.common.close}
       >
         {templateModalState ? (
           <>
-            {templateModalState.allowSourceSelection && templates.length > 0 ? (
+            {templateModalState.mode === 'duplicate' &&
+            templateModalState.allowSourceSelection &&
+            templates.length > 0 ? (
               <label>
                 {copy.templateForm.selectDuplicateSource}
                 <select
                   value={templateModalState.sourceTemplateId ?? ''}
                   onChange={(event) =>
                     setTemplateModalState((current) =>
-                      current
+                      current && current.mode === 'duplicate'
                         ? {
                             ...current,
                             sourceTemplateId: event.target.value || undefined,
@@ -972,12 +1457,20 @@ function WorkoutDashboard() {
             ) : null}
 
             <TemplateEditor
-              key={templateModalState.sourceTemplateId ?? 'template_blank'}
+              key={
+                templateModalState.mode === 'edit'
+                  ? templateModalState.templateId
+                  : templateModalState.mode === 'duplicate'
+                    ? templateModalState.sourceTemplateId ?? 'template_blank'
+                    : 'template_blank'
+              }
               language={language}
-              mode={templateModalState.duplicateIntent ? 'duplicate' : 'create'}
+              mode={templateModalState.mode}
               initialName={templateEditorInitialName}
               initialStartDate={templateEditorInitialStartDate}
               initialDays={templateEditorInitialDays}
+              exerciseSuggestions={templateExerciseSuggestions}
+              exerciseHistory={exerciseHistory}
               onSubmit={handleSaveTemplate}
               onCancel={() => setTemplateModalState(null)}
             />
@@ -995,6 +1488,7 @@ function WorkoutDashboard() {
           <SessionPlanEditor
             language={language}
             plan={previewPlan}
+            exerciseHistory={exerciseHistory}
             onSave={handleSaveSessionPlan}
             onCancel={() => setPreviewSessionId(null)}
           />

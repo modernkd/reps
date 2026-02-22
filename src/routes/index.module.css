@@ -65,6 +65,22 @@
   padding: 0.9rem;
 }
 
+.workoutModeSurface {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.workoutModeError {
+  max-width: 860px;
+  margin: 0 auto;
+  border: 1px solid color-mix(in srgb, var(--danger-500) 50%, var(--ink-250));
+  background: color-mix(in srgb, var(--danger-500) 12%, var(--surface-0));
+  border-radius: 12px;
+  color: var(--danger-700);
+  padding: 0.65rem 0.8rem;
+}
+
 @media (max-width: 980px) {
   .calendarLayout {
     grid-template-columns: 1fr;
@@ -79,7 +95,29 @@
 
   .main,
   .calendarLayout,
-  .fullWidth {
+  .fullWidth,
+  .workoutModeSurface {
     gap: 0.75rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .container {
+    padding: 0.75rem 0.55rem 1.35rem;
+    gap: 0.65rem;
+  }
+
+  .floatingCard,
+  .workoutModeError,
+  .error,
+  .emptyState {
+    border-radius: 12px;
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding-bottom: calc(6.4rem + env(safe-area-inset-bottom));
   }
 }

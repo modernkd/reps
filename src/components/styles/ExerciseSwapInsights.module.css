@@ -1,0 +1,97 @@
+.root {
+  border: 1px solid var(--ink-180);
+  border-radius: 11px;
+  padding: 0.65rem;
+  background: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
+  display: grid;
+  gap: 0.65rem;
+}
+
+.swapColumns {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.swapBlock {
+  border: 1px solid var(--ink-160);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface-0) 94%, var(--surface-1));
+  padding: 0.48rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 0.79rem;
+  color: var(--ink-700);
+}
+
+.loading,
+.emptyState {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ink-500);
+}
+
+.optionList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.optionButton {
+  width: 100%;
+  border: 1px solid var(--ink-220);
+  border-radius: 8px;
+  background: var(--surface-0);
+  color: var(--ink-900);
+  text-align: left;
+  padding: 0.38rem 0.45rem;
+  display: grid;
+  gap: 0.18rem;
+  cursor: pointer;
+}
+
+.optionButton:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 1px;
+}
+
+.optionName {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.optionMeta {
+  font-size: 0.7rem;
+  color: var(--ink-600);
+}
+
+.techniqueBlock {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.techniqueList {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.techniqueItem {
+  font-size: 0.75rem;
+  color: var(--ink-700);
+  line-height: 1.35;
+}
+
+@media (max-width: 900px) {
+  .swapColumns {
+    grid-template-columns: 1fr;
+  }
+}

@@ -10,6 +10,22 @@
   color: var(--ink-700);
 }
 
+.sliderField {
+  border: 1px solid var(--ink-250);
+  border-radius: 10px;
+  background: var(--surface-0);
+  padding: 0.6rem 0.4rem;
+}
+
+.sliderField:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 40%, transparent);
+  border-color: var(--accent-500);
+}
+
+.sliderField :global(.slider-container) {
+  width: 100%;
+}
+
 .form input,
 .form select,
 .form textarea {
@@ -43,7 +59,7 @@
 
 .primary,
 .secondary {
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   padding: 0.5rem 0.95rem;
   font-size: 0.92rem;
   border: 1px solid transparent;
@@ -64,4 +80,35 @@
   border-color: var(--ink-300);
   background: var(--surface-0);
   color: var(--ink-800);
+}
+
+@media (max-width: 560px) {
+  .form {
+    gap: 0.7rem;
+  }
+
+  .form label {
+    font-size: 0.86rem;
+  }
+
+  .actions {
+    margin-top: 0.35rem;
+    flex-direction: column-reverse;
+    justify-content: stretch;
+    position: sticky;
+    bottom: calc(env(safe-area-inset-bottom) * -1);
+    margin-left: -1rem;
+    margin-right: -1rem;
+    margin-bottom: calc(-1rem - env(safe-area-inset-bottom));
+    padding: 0.65rem 1rem calc(0.85rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--ink-150);
+    background: color-mix(in srgb, var(--surface-0) 94%, transparent);
+    z-index: 2;
+  }
+
+  .primary,
+  .secondary {
+    width: 100%;
+    min-height: 2.55rem;
+  }
 }
