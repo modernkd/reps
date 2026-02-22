@@ -1,6 +1,6 @@
 .wrapper {
   border: 1px solid var(--ink-200);
-  border-radius: 16px;
+  border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
   padding: 0.9rem;
@@ -99,7 +99,7 @@
   position: absolute;
   transform: translate(0.6rem, -100%);
   pointer-events: none;
-  border-radius: 10px;
+  border-radius: 6px;
   background: color-mix(in srgb, var(--ink-950) 93%, transparent);
   color: #fff;
   padding: 0.45rem 0.6rem;
@@ -114,7 +114,7 @@
 
 .empty {
   border: 1px dashed var(--ink-300);
-  border-radius: 16px;
+  border-radius: 7px;
   background: var(--surface-0);
   text-align: center;
   padding: 2rem 1rem;
@@ -142,7 +142,7 @@
 
 .simpleGraph {
   border: 1px solid var(--ink-150);
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: clip;
   background: color-mix(in srgb, var(--surface-1) 55%, var(--surface-0));
 }
@@ -199,7 +199,7 @@
 
 .performanceControls select {
   border: 1px solid var(--ink-250);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-size: 0.82rem;
   background: var(--surface-0);
@@ -226,6 +226,172 @@
   margin: 0;
   font-size: 0.78rem;
   color: var(--ink-600);
+}
+
+.insightSection {
+  border-top: 1px solid var(--ink-150);
+  padding-top: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.insightHeader h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-700);
+}
+
+.insightHeader p {
+  margin: 0.18rem 0 0;
+  color: var(--ink-600);
+  font-size: 0.78rem;
+}
+
+.insightEmpty {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 0.82rem;
+}
+
+.insightMeta {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 0.76rem;
+}
+
+.coverageTable {
+  display: grid;
+  gap: 0.28rem;
+  border: 1px solid var(--ink-150);
+  border-radius: 6px;
+  padding: 0.45rem;
+  overflow-x: auto;
+  align-items: center;
+}
+
+.coverageRowLabel,
+.coverageColumnLabel {
+  font-size: 0.72rem;
+  color: var(--ink-700);
+  white-space: nowrap;
+}
+
+.coverageColumnLabel {
+  text-align: center;
+}
+
+.coverageCell {
+  min-height: 1.75rem;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-900);
+  border: 1px solid color-mix(in srgb, var(--ink-200) 80%, transparent);
+}
+
+.coverageCell0 {
+  background: color-mix(in srgb, var(--surface-1) 45%, var(--surface-0));
+  color: var(--ink-500);
+}
+
+.coverageCell1 {
+  background: color-mix(in srgb, var(--accent-400) 18%, var(--surface-0));
+}
+
+.coverageCell2 {
+  background: color-mix(in srgb, var(--accent-500) 28%, var(--surface-0));
+}
+
+.coverageCell3 {
+  background: color-mix(in srgb, var(--accent-600) 40%, var(--surface-0));
+}
+
+.coverageCell4 {
+  background: color-mix(in srgb, var(--accent-700) 50%, var(--surface-0));
+  color: color-mix(in srgb, var(--ink-950) 85%, white);
+}
+
+.balanceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.balanceCard {
+  border: 1px solid var(--ink-150);
+  border-radius: 6px;
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.32rem;
+  background: color-mix(in srgb, var(--surface-1) 60%, var(--surface-0));
+}
+
+.balanceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--ink-700);
+}
+
+.balanceTrack {
+  width: 100%;
+  height: 0.34rem;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink-150) 70%, transparent);
+}
+
+.balanceFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-600);
+}
+
+.trendRows {
+  display: grid;
+  gap: 0.48rem;
+}
+
+.trendRow {
+  border: 1px solid var(--ink-150);
+  border-radius: 6px;
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.4rem;
+  background: color-mix(in srgb, var(--surface-1) 62%, var(--surface-0));
+}
+
+.trendHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--ink-700);
+}
+
+.trendBars {
+  display: grid;
+  gap: 0.28rem;
+  align-items: end;
+  min-height: 2.65rem;
+}
+
+.trendBarWrap {
+  height: 2.65rem;
+  display: flex;
+  align-items: flex-end;
+}
+
+.trendBar {
+  width: 100%;
+  border-radius: 5px 5px 2px 2px;
+  background: color-mix(in srgb, var(--accent-600) 82%, var(--ink-900));
 }
 
 @media (max-width: 820px) {
@@ -265,11 +431,23 @@
   .performanceControls select {
     width: 100%;
   }
+
+  .balanceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .trendBarWrap {
+    height: 2.2rem;
+  }
+
+  .trendBars {
+    min-height: 2.2rem;
+  }
 }
 
 @media (max-width: 520px) {
   .wrapper {
-    border-radius: 13px;
+    border-radius: 6px;
     padding: 0.65rem;
   }
 
@@ -284,5 +462,19 @@
   .tooltip {
     font-size: 0.68rem;
     padding: 0.35rem 0.45rem;
+  }
+
+  .coverageTable {
+    padding: 0.35rem;
+  }
+
+  .coverageCell {
+    min-height: 1.55rem;
+    font-size: 0.66rem;
+  }
+
+  .coverageRowLabel,
+  .coverageColumnLabel {
+    font-size: 0.66rem;
   }
 }

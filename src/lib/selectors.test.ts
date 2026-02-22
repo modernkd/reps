@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   getCalendarMonthModel,
+  getExerciseInsights,
   getExerciseProgressSummaries,
   getLatestWeightByExerciseName,
   getRunProgressSeries,
@@ -213,5 +214,54 @@ describe('selectors', () => {
     expect(lateralRaises).toBeDefined()
     expect(lateralRaises?.totalLogs).toBe(0)
     expect(lateralRaises?.lastRecordedAt).toBeNull()
+  })
+
+  it('builds weekly exercise insights for muscles, balance, and trends', () => {
+    const insights = getExerciseInsights({
+      workouts,
+      weekStarts: ['2026-02-02', '2026-02-09'],
+      metadataByExercise: {
+        'bench press': {
+          equipment: 'barbell',
+          level: 'beginner',
+          primaryMuscles: ['chest', 'triceps'],
+        },
+        e2: {
+          equipment: 'treadmill',
+          level: 'beginner',
+          primaryMuscles: ['quadriceps'],
+        },
+      },
+    })
+
+    expect(insights.muscleCoverage).toHaveLength(2)
+
+    const firstWeek = insights.muscleCoverage[0]
+    const secondWeek = insights.muscleCoverage[1]
+
+    expect(firstWeek?.weekStart).toBe('2026-02-02')
+    expect(firstWeek?.muscles.chest).toBe(2)
+    expect(firstWeek?.muscles.triceps).toBe(2)
+    expect(firstWeek?.muscles.quads).toBe(1)
+
+    expect(secondWeek?.weekStart).toBe('2026-02-09')
+    expect(secondWeek?.muscles.chest).toBe(1)
+    expect(secondWeek?.muscles.triceps).toBe(1)
+    expect(secondWeek?.muscles.quads).toBe(0)
+
+    expect(insights.balance).toEqual({
+      push: 3,
+      pull: 0,
+      lower: 1,
+    })
+
+    expect(insights.equipmentTrends).toEqual([
+      { key: 'barbell', total: 3, points: [2, 1] },
+      { key: 'treadmill', total: 1, points: [1, 0] },
+    ])
+
+    expect(insights.difficultyTrends).toEqual([
+      { key: 'beginner', total: 4, points: [3, 1] },
+    ])
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   axisBottom,
@@ -20,9 +20,12 @@ import gsap from 'gsap'
 import type { AppLanguage } from '@/lib/i18n'
 import { getCopy, getDateLocale, localizeWorkoutTypeName } from '@/lib/i18n'
 import {
+  getExerciseInsights,
   getRunProgressSeries,
   getStrengthExerciseNames,
   getStrengthProgressSeries,
+  type ExerciseInsightMetadata,
+  type MajorMuscleGroup,
 } from '@/lib/selectors'
 import type {
   ProgressPoint,
@@ -55,6 +58,25 @@ const WIDTH = 900
 const HEIGHT = 360
 const MARGIN = { top: 18, right: 56, bottom: 34, left: 48 }
 
+function normalizeInsightKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function formatInsightLabel(value: string): string {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function getMuscleLabel(
+  graphCopy: ReturnType<typeof getCopy>['graph'],
+  muscle: MajorMuscleGroup,
+): string {
+  return graphCopy.muscles[muscle]
+}
+
 export function GraphView({
   language,
   series,
@@ -74,6 +96,9 @@ export function GraphView({
   const [focusTypeId, setFocusTypeId] = useState<string>('')
   const [selectedExercise, setSelectedExercise] = useState<string>('')
   const [runMetric, setRunMetric] = useState<'pace' | 'speed'>('pace')
+  const [metadataByExercise, setMetadataByExercise] = useState<
+    Record<string, ExerciseInsightMetadata | undefined>
+  >({})
 
   const points = useMemo(
     () =>
@@ -96,6 +121,7 @@ export function GraphView({
   const maxFrequency = max(points, (point) => point.workoutsPerWeek) ?? 1
   const maxDuration = max(points, (point) => point.totalDurationPerWeek) ?? 1
   const weightPoints = points.filter((point) => point.avgWeightKg !== null)
+  const weekStarts = useMemo(() => points.map((point) => point.weekStart), [points])
 
   const xScale = useMemo(
     () => scaleTime().domain(xDomain).range([0, drawableWidth]),
@@ -137,6 +163,128 @@ export function GraphView({
       activeTypes ? activeTypes.has(workout.type) : true,
     )
   }, [selectedTypeIds, workouts])
+
+  const insightLookupNames = useMemo(() => {
+    const keys = new Set<string>()
+
+    for (const workout of scopedWorkouts) {
+      for (const setLog of workout.sessionSummary?.setLogs ?? []) {
+        if (setLog.exerciseName?.trim()) {
+          keys.add(setLog.exerciseName.trim())
+        }
+        if (setLog.exerciseId?.trim()) {
+          keys.add(setLog.exerciseId.trim())
+        }
+      }
+    }
+
+    return [...keys]
+  }, [scopedWorkouts])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadInsightMetadata() {
+      if (insightLookupNames.length === 0) {
+        if (!cancelled) {
+          setMetadataByExercise({})
+        }
+        return
+      }
+
+      const { getExerciseByName } = await import('@/lib/exerciseDb')
+      const lookups = await Promise.all(
+        insightLookupNames.map(async (rawKey) => ({
+          rawKey,
+          exercise: await getExerciseByName(rawKey),
+        })),
+      )
+
+      if (cancelled) {
+        return
+      }
+
+      const next: Record<string, ExerciseInsightMetadata | undefined> = {}
+      for (const lookup of lookups) {
+        const normalizedRaw = normalizeInsightKey(lookup.rawKey)
+        if (!normalizedRaw) {
+          continue
+        }
+
+        const exercise = lookup.exercise
+        if (!exercise) {
+          continue
+        }
+
+        const metadata: ExerciseInsightMetadata = {
+          equipment: exercise.equipment,
+          level: exercise.level,
+          primaryMuscles: exercise.primaryMuscles,
+        }
+
+        next[normalizedRaw] = metadata
+        next[normalizeInsightKey(exercise.name)] = metadata
+        next[normalizeInsightKey(exercise.id)] = metadata
+      }
+
+      setMetadataByExercise(next)
+    }
+
+    void loadInsightMetadata()
+
+    return () => {
+      cancelled = true
+    }
+  }, [insightLookupNames])
+
+  const exerciseInsights = useMemo(
+    () =>
+      getExerciseInsights({
+        workouts: scopedWorkouts,
+        weekStarts,
+        metadataByExercise,
+      }),
+    [metadataByExercise, scopedWorkouts, weekStarts],
+  )
+
+  const muscleCoverageMax = useMemo(() => {
+    const values = exerciseInsights.muscleCoverage.flatMap((week) =>
+      exerciseInsights.muscleGroups.map((muscle) => week.muscles[muscle]),
+    )
+
+    return max(values) ?? 0
+  }, [exerciseInsights])
+
+  const hasMuscleCoverage = useMemo(
+    () =>
+      exerciseInsights.muscleCoverage.some((week) =>
+        exerciseInsights.muscleGroups.some((muscle) => week.muscles[muscle] > 0),
+      ),
+    [exerciseInsights],
+  )
+
+  const balanceTotal =
+    exerciseInsights.balance.push +
+    exerciseInsights.balance.pull +
+    exerciseInsights.balance.lower
+
+  const balanceItems = [
+    {
+      key: 'push',
+      label: copy.graph.pushLabel,
+      value: exerciseInsights.balance.push,
+    },
+    {
+      key: 'pull',
+      label: copy.graph.pullLabel,
+      value: exerciseInsights.balance.pull,
+    },
+    {
+      key: 'lower',
+      label: copy.graph.lowerLabel,
+      value: exerciseInsights.balance.lower,
+    },
+  ] as const
 
   const typeOptions = useMemo(() => {
     const present = new Set(scopedWorkouts.map((workout) => workout.type))
@@ -533,6 +681,196 @@ export function GraphView({
 
         <p className={styles.metricLabel}>{performanceYLabel}</p>
       </div>
+
+      <section className={styles.insightSection}>
+        <header className={styles.insightHeader}>
+          <h4>{copy.graph.muscleCoverageTitle}</h4>
+          <p>{copy.graph.muscleCoverageSubtitle}</p>
+        </header>
+        {hasMuscleCoverage ? (
+          <div
+            className={styles.coverageTable}
+            role="table"
+            aria-label={copy.graph.muscleCoverageTitle}
+            style={{
+              gridTemplateColumns: `minmax(6.4rem, auto) repeat(${Math.max(
+                1,
+                weekStarts.length,
+              )}, minmax(2.3rem, 1fr))`,
+            }}
+          >
+            <div className={styles.coverageRowLabel}>{copy.graph.muscleLabel}</div>
+            {weekStarts.map((weekStart) => (
+              <div key={`week-header-${weekStart}`} className={styles.coverageColumnLabel}>
+                {format(parseISO(weekStart), 'MMM d', { locale: dateLocale })}
+              </div>
+            ))}
+
+            {exerciseInsights.muscleGroups.map((muscle) => (
+              <Fragment key={muscle}>
+                <div className={styles.coverageRowLabel}>
+                  {getMuscleLabel(copy.graph, muscle)}
+                </div>
+                {exerciseInsights.muscleCoverage.map((week) => {
+                  const value = week.muscles[muscle]
+                  const intensity =
+                    muscleCoverageMax > 0
+                      ? Math.min(4, Math.ceil((value / muscleCoverageMax) * 4))
+                      : 0
+
+                  return (
+                    <div
+                      key={`${muscle}-${week.weekStart}`}
+                      className={`${styles.coverageCell} ${
+                        intensity === 0
+                          ? styles.coverageCell0
+                          : intensity === 1
+                            ? styles.coverageCell1
+                            : intensity === 2
+                              ? styles.coverageCell2
+                              : intensity === 3
+                                ? styles.coverageCell3
+                                : styles.coverageCell4
+                      }`}
+                      aria-label={`${getMuscleLabel(copy.graph, muscle)} ${format(
+                        parseISO(week.weekStart),
+                        'MMM d',
+                        { locale: dateLocale },
+                      )}: ${value}`}
+                    >
+                      {value > 0 ? value : ''}
+                    </div>
+                  )
+                })}
+              </Fragment>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.insightEmpty}>{copy.graph.muscleCoverageEmpty}</p>
+        )}
+      </section>
+
+      <section className={styles.insightSection}>
+        <header className={styles.insightHeader}>
+          <h4>{copy.graph.balanceTitle}</h4>
+          <p>{copy.graph.balanceSubtitle}</p>
+        </header>
+        {balanceTotal > 0 ? (
+          <>
+            <div className={styles.balanceGrid}>
+              {balanceItems.map((item) => {
+                const ratio = balanceTotal > 0 ? (item.value / balanceTotal) * 100 : 0
+                return (
+                  <article key={item.key} className={styles.balanceCard}>
+                    <div className={styles.balanceRow}>
+                      <span>{item.label}</span>
+                      <strong>{item.value.toFixed(1)}</strong>
+                    </div>
+                    <div className={styles.balanceTrack} aria-hidden>
+                      <span className={styles.balanceFill} style={{ width: `${ratio}%` }} />
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+            <p className={styles.insightMeta}>{copy.graph.totalSets(balanceTotal)}</p>
+          </>
+        ) : (
+          <p className={styles.insightEmpty}>{copy.graph.balanceEmpty}</p>
+        )}
+      </section>
+
+      <section className={styles.insightSection}>
+        <header className={styles.insightHeader}>
+          <h4>{copy.graph.equipmentTrendsTitle}</h4>
+          <p>{copy.graph.equipmentTrendsSubtitle}</p>
+        </header>
+        {exerciseInsights.equipmentTrends.length > 0 ? (
+          <div className={styles.trendRows}>
+            {exerciseInsights.equipmentTrends.map((trend) => {
+              const peak = Math.max(1, ...trend.points)
+
+              return (
+                <article key={trend.key} className={styles.trendRow}>
+                  <div className={styles.trendHeader}>
+                    <span>{formatInsightLabel(trend.key)}</span>
+                    <strong>{copy.graph.totalSets(trend.total)}</strong>
+                  </div>
+                  <div
+                    className={styles.trendBars}
+                    style={{
+                      gridTemplateColumns: `repeat(${Math.max(1, trend.points.length)}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {trend.points.map((value, index) => (
+                      <div key={`${trend.key}-${index}`} className={styles.trendBarWrap}>
+                        <div
+                          className={styles.trendBar}
+                          style={{
+                            height: value > 0 ? `${Math.max(20, (value / peak) * 100)}%` : '8%',
+                            opacity: value > 0 ? 0.9 : 0.35,
+                          }}
+                          title={`${format(parseISO(weekStarts[index] ?? weekStarts[0]), 'MMM d', {
+                            locale: dateLocale,
+                          })}: ${value}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <p className={styles.insightEmpty}>{copy.graph.equipmentTrendsEmpty}</p>
+        )}
+      </section>
+
+      <section className={styles.insightSection}>
+        <header className={styles.insightHeader}>
+          <h4>{copy.graph.difficultyTrendsTitle}</h4>
+          <p>{copy.graph.difficultyTrendsSubtitle}</p>
+        </header>
+        {exerciseInsights.difficultyTrends.length > 0 ? (
+          <div className={styles.trendRows}>
+            {exerciseInsights.difficultyTrends.map((trend) => {
+              const peak = Math.max(1, ...trend.points)
+
+              return (
+                <article key={trend.key} className={styles.trendRow}>
+                  <div className={styles.trendHeader}>
+                    <span>{formatInsightLabel(trend.key)}</span>
+                    <strong>{copy.graph.totalSets(trend.total)}</strong>
+                  </div>
+                  <div
+                    className={styles.trendBars}
+                    style={{
+                      gridTemplateColumns: `repeat(${Math.max(1, trend.points.length)}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {trend.points.map((value, index) => (
+                      <div key={`${trend.key}-${index}`} className={styles.trendBarWrap}>
+                        <div
+                          className={styles.trendBar}
+                          style={{
+                            height: value > 0 ? `${Math.max(20, (value / peak) * 100)}%` : '8%',
+                            opacity: value > 0 ? 0.9 : 0.35,
+                          }}
+                          title={`${format(parseISO(weekStarts[index] ?? weekStarts[0]), 'MMM d', {
+                            locale: dateLocale,
+                          })}: ${value}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        ) : (
+          <p className={styles.insightEmpty}>{copy.graph.difficultyTrendsEmpty}</p>
+        )}
+      </section>
     </section>
   )
 }

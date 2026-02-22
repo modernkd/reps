@@ -51,8 +51,112 @@ export type ExerciseProgressSummary = {
   weightPoints: Array<{ date: string; value: number }>
 }
 
+export type ExerciseInsightMetadata = {
+  equipment?: string
+  level?: string
+  primaryMuscles?: string[]
+}
+
+const MAJOR_MUSCLE_GROUPS = [
+  'chest',
+  'back',
+  'shoulders',
+  'biceps',
+  'triceps',
+  'quads',
+  'hamstrings',
+  'glutes',
+  'calves',
+  'core',
+] as const
+
+export type MajorMuscleGroup = (typeof MAJOR_MUSCLE_GROUPS)[number]
+
+export type WeeklyMuscleCoveragePoint = {
+  weekStart: string
+  muscles: Record<MajorMuscleGroup, number>
+}
+
+export type TrendSeriesPoint = {
+  key: string
+  points: number[]
+  total: number
+}
+
+export type ExerciseInsights = {
+  muscleGroups: readonly MajorMuscleGroup[]
+  muscleCoverage: WeeklyMuscleCoveragePoint[]
+  balance: {
+    push: number
+    pull: number
+    lower: number
+  }
+  equipmentTrends: TrendSeriesPoint[]
+  difficultyTrends: TrendSeriesPoint[]
+}
+
+const PUSH_GROUPS = new Set<MajorMuscleGroup>(['chest', 'shoulders', 'triceps'])
+const PULL_GROUPS = new Set<MajorMuscleGroup>(['back', 'biceps'])
+const LOWER_GROUPS = new Set<MajorMuscleGroup>(['quads', 'hamstrings', 'glutes', 'calves'])
+
+const MUSCLE_ALIASES: Record<string, MajorMuscleGroup> = {
+  chest: 'chest',
+  'middle back': 'back',
+  'lower back': 'back',
+  lats: 'back',
+  traps: 'back',
+  shoulders: 'shoulders',
+  delts: 'shoulders',
+  biceps: 'biceps',
+  triceps: 'triceps',
+  quadriceps: 'quads',
+  quads: 'quads',
+  hamstrings: 'hamstrings',
+  glutes: 'glutes',
+  calves: 'calves',
+  abdominals: 'core',
+  abs: 'core',
+  obliques: 'core',
+}
+
 function normalizeExerciseName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function normalizeInsightKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function createEmptyMuscleRecord(): Record<MajorMuscleGroup, number> {
+  return {
+    chest: 0,
+    back: 0,
+    shoulders: 0,
+    biceps: 0,
+    triceps: 0,
+    quads: 0,
+    hamstrings: 0,
+    glutes: 0,
+    calves: 0,
+    core: 0,
+  }
+}
+
+function resolveMajorMuscles(primaryMuscles: string[] | undefined): MajorMuscleGroup[] {
+  if (!primaryMuscles || primaryMuscles.length === 0) {
+    return []
+  }
+
+  const resolved = new Set<MajorMuscleGroup>()
+  for (const raw of primaryMuscles) {
+    const normalized = normalizeInsightKey(raw)
+    const mapped = MUSCLE_ALIASES[normalized]
+    if (mapped) {
+      resolved.add(mapped)
+    }
+  }
+
+  return [...resolved]
 }
 
 export function getExerciseHistory(workouts: Workout[]): ExerciseHistoryEntry[] {
@@ -475,4 +579,137 @@ export function getRunProgressSeries(input: {
       }
     })
     .sort((a, b) => compareAsc(parseISO(a.date), parseISO(b.date)))
+}
+
+export function getExerciseInsights(input: {
+  workouts: Workout[]
+  weekStarts: string[]
+  metadataByExercise: Record<string, ExerciseInsightMetadata | undefined>
+}): ExerciseInsights {
+  const weekBucket = new Map<
+    string,
+    {
+      muscles: Record<MajorMuscleGroup, number>
+      equipment: Record<string, number>
+      difficulty: Record<string, number>
+    }
+  >()
+
+  const equipmentTotals = new Map<string, number>()
+  const difficultyTotals = new Map<string, number>()
+  let pushTotal = 0
+  let pullTotal = 0
+  let lowerTotal = 0
+
+  for (const weekStart of input.weekStarts) {
+    weekBucket.set(weekStart, {
+      muscles: createEmptyMuscleRecord(),
+      equipment: {},
+      difficulty: {},
+    })
+  }
+
+  for (const workout of input.workouts) {
+    const workoutDate = parseISO(workout.date)
+    const weekStart = format(startOfWeek(workoutDate, { weekStartsOn: 1 }), DATE_FORMAT)
+    const bucket = weekBucket.get(weekStart)
+    if (!bucket) {
+      continue
+    }
+
+    for (const setLog of workout.sessionSummary?.setLogs ?? []) {
+      const candidateKeys = [
+        normalizeInsightKey(setLog.exerciseName ?? ''),
+        normalizeInsightKey(setLog.exerciseId),
+      ].filter((value) => value.length > 0)
+
+      let metadata: ExerciseInsightMetadata | undefined
+      for (const key of candidateKeys) {
+        const matched = input.metadataByExercise[key]
+        if (matched) {
+          metadata = matched
+          break
+        }
+      }
+
+      if (!metadata) {
+        continue
+      }
+
+      const majorMuscles = resolveMajorMuscles(metadata.primaryMuscles)
+      for (const muscle of majorMuscles) {
+        bucket.muscles[muscle] += 1
+      }
+
+      const hasLower = majorMuscles.some((muscle) => LOWER_GROUPS.has(muscle))
+      const hasPush = majorMuscles.some((muscle) => PUSH_GROUPS.has(muscle))
+      const hasPull = majorMuscles.some((muscle) => PULL_GROUPS.has(muscle))
+
+      if (hasLower) {
+        lowerTotal += 1
+      } else if (hasPush && !hasPull) {
+        pushTotal += 1
+      } else if (hasPull && !hasPush) {
+        pullTotal += 1
+      } else if (hasPush && hasPull) {
+        pushTotal += 0.5
+        pullTotal += 0.5
+      }
+
+      const equipmentKey = normalizeInsightKey(metadata.equipment ?? '')
+      if (equipmentKey) {
+        bucket.equipment[equipmentKey] = (bucket.equipment[equipmentKey] ?? 0) + 1
+        equipmentTotals.set(equipmentKey, (equipmentTotals.get(equipmentKey) ?? 0) + 1)
+      }
+
+      const difficultyKey = normalizeInsightKey(metadata.level ?? '')
+      if (difficultyKey) {
+        bucket.difficulty[difficultyKey] = (bucket.difficulty[difficultyKey] ?? 0) + 1
+        difficultyTotals.set(difficultyKey, (difficultyTotals.get(difficultyKey) ?? 0) + 1)
+      }
+    }
+  }
+
+  const muscleCoverage = input.weekStarts.map((weekStart) => ({
+    weekStart,
+    muscles: weekBucket.get(weekStart)?.muscles ?? createEmptyMuscleRecord(),
+  }))
+
+  const topEquipmentKeys = [...equipmentTotals.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 5)
+    .map(([key]) => key)
+
+  const equipmentTrends = topEquipmentKeys.map((key) => ({
+    key,
+    total: equipmentTotals.get(key) ?? 0,
+    points: input.weekStarts.map((weekStart) => weekBucket.get(weekStart)?.equipment[key] ?? 0),
+  }))
+
+  const preferredDifficultyOrder = ['beginner', 'intermediate', 'advanced', 'expert']
+  const orderedDifficultyKeys = preferredDifficultyOrder.filter((key) =>
+    difficultyTotals.has(key),
+  )
+  const extraDifficultyKeys = [...difficultyTotals.keys()]
+    .filter((key) => !orderedDifficultyKeys.includes(key))
+    .sort((a, b) => a.localeCompare(b))
+  const allDifficultyKeys = [...orderedDifficultyKeys, ...extraDifficultyKeys]
+
+  const difficultyTrends = allDifficultyKeys.map((key) => ({
+    key,
+    total: difficultyTotals.get(key) ?? 0,
+    points: input.weekStarts.map((weekStart) => weekBucket.get(weekStart)?.difficulty[key] ?? 0),
+  }))
+
+  return {
+    muscleGroups: MAJOR_MUSCLE_GROUPS,
+    muscleCoverage,
+    balance: {
+      push: Number(pushTotal.toFixed(1)),
+      pull: Number(pullTotal.toFixed(1)),
+      lower: Number(lowerTotal.toFixed(1)),
+    },
+    equipmentTrends,
+    difficultyTrends,
+  }
 }
