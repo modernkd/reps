@@ -123,11 +123,31 @@
   text-decoration: none;
 }
 
+.legalLinks {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  font-size: 0.83rem;
+}
+
+.legalLink {
+  color: var(--ink-700);
+  text-decoration: none;
+}
+
+.legalLink:hover {
+  color: var(--ink-900);
+  text-decoration: underline;
+}
+
 .modeActions button:focus-visible,
 .form input:focus-visible,
 .form button:focus-visible,
 .googleButton:focus-visible,
-.secondaryLink:focus-visible {
+.secondaryLink:focus-visible,
+.legalLink:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
   outline-offset: 2px;
 }

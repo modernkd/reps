@@ -12,6 +12,35 @@
   justify-content: flex-end;
 }
 
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.legalLinks {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.82rem;
+}
+
+.link {
+  color: var(--ink-700);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--ink-900);
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 60%, transparent);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
 .controls {
   display: inline-flex;
   align-items: center;
@@ -127,6 +156,15 @@
 @media (max-width: 760px) {
   .inner {
     padding: 0.75rem 0.75rem 0.9rem;
+    justify-content: center;
+  }
+
+  .row {
+    flex-direction: column-reverse;
+    gap: 0.7rem;
+  }
+
+  .legalLinks {
     justify-content: center;
   }
 

@@ -41,4 +41,17 @@ describe('AppFooterControls', () => {
 
     expect(button).toHaveAttribute('aria-pressed', 'true')
   })
+
+  it('renders legal links', () => {
+    renderFooter('light', 'en')
+
+    expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
+      'href',
+      '/privacy',
+    )
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
+      'href',
+      '/terms',
+    )
+  })
 })

@@ -1,16 +1,20 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
+import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { TanStackDevtools } from "@tanstack/react-devtools";
 
-import appCss from '../styles.css?url'
+import appCss from "../styles.css?url";
 
-const appTitle = 'Workout Tracker'
-const appDescription = 'Track workouts, follow plans, and recover skipped days.'
-const socialImagePath = '/og-image.png'
-const socialImageAlt = 'Workout Tracker dashboard preview'
-const siteUrl = import.meta.env.VITE_SITE_URL?.trim().replace(/\/+$/, '') || undefined
-const canonicalUrl = siteUrl ? `${siteUrl}/` : '/'
-const socialImageUrl = siteUrl ? `${siteUrl}${socialImagePath}` : socialImagePath
+const appTitle = "Reps";
+const appDescription =
+  "Track workouts, follow plans, and recover skipped days.";
+const socialImagePath = "/og-image.png";
+const socialImageAlt = "Reps dashboard preview";
+const siteUrl =
+  import.meta.env.VITE_SITE_URL?.trim().replace(/\/+$/, "") || undefined;
+const canonicalUrl = siteUrl ? `${siteUrl}/` : "/";
+const socialImageUrl = siteUrl
+  ? `${siteUrl}${socialImagePath}`
+  : socialImagePath;
 
 const themeInitializationScript = `
 (function () {
@@ -32,7 +36,7 @@ const themeInitializationScript = `
     themeMeta.setAttribute('content', theme === 'dark' ? '#1a1c24' : '#fbfcff');
   }
 })();
-`
+`;
 
 const serviceWorkerRegistrationScript = `
 if ('serviceWorker' in navigator) {
@@ -42,136 +46,136 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
-`
+`;
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       {
-        charSet: 'utf-8',
+        charSet: "utf-8",
       },
       {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
       },
       {
         title: appTitle,
       },
       {
-        name: 'description',
+        name: "description",
         content: appDescription,
       },
       {
-        name: 'theme-color',
-        content: '#1a1c24',
+        name: "theme-color",
+        content: "#1a1c24",
       },
       {
-        property: 'og:type',
-        content: 'website',
+        property: "og:type",
+        content: "website",
       },
       {
-        property: 'og:site_name',
+        property: "og:site_name",
         content: appTitle,
       },
       {
-        property: 'og:locale',
-        content: 'en_US',
+        property: "og:locale",
+        content: "en_US",
       },
       {
-        property: 'og:title',
+        property: "og:title",
         content: appTitle,
       },
       {
-        property: 'og:description',
+        property: "og:description",
         content: appDescription,
       },
       {
-        property: 'og:url',
+        property: "og:url",
         content: canonicalUrl,
       },
       {
-        property: 'og:image',
+        property: "og:image",
         content: socialImageUrl,
       },
       {
-        property: 'og:image:width',
-        content: '1200',
+        property: "og:image:width",
+        content: "1200",
       },
       {
-        property: 'og:image:height',
-        content: '630',
+        property: "og:image:height",
+        content: "630",
       },
       {
-        property: 'og:image:alt',
+        property: "og:image:alt",
         content: socialImageAlt,
       },
       {
-        name: 'twitter:card',
-        content: 'summary_large_image',
+        name: "twitter:card",
+        content: "summary_large_image",
       },
       {
-        name: 'twitter:title',
+        name: "twitter:title",
         content: appTitle,
       },
       {
-        name: 'twitter:description',
+        name: "twitter:description",
         content: appDescription,
       },
       {
-        name: 'twitter:image',
+        name: "twitter:image",
         content: socialImageUrl,
       },
       {
-        name: 'twitter:image:alt',
+        name: "twitter:image:alt",
         content: socialImageAlt,
       },
       {
-        name: 'apple-mobile-web-app-capable',
-        content: 'yes',
+        name: "apple-mobile-web-app-capable",
+        content: "yes",
       },
       {
-        name: 'apple-mobile-web-app-title',
+        name: "apple-mobile-web-app-title",
         content: appTitle,
       },
     ],
     links: [
       {
-        rel: 'canonical',
+        rel: "canonical",
         href: canonicalUrl,
       },
       {
-        rel: 'stylesheet',
+        rel: "stylesheet",
         href: appCss,
       },
       {
-        rel: 'manifest',
-        href: '/manifest.json',
+        rel: "manifest",
+        href: "/manifest.json",
       },
       {
-        rel: 'icon',
-        href: '/favicon.ico',
+        rel: "icon",
+        href: "/favicon.ico",
       },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '32x32',
-        href: '/favicon-32.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "32x32",
+        href: "/favicon-32.png",
       },
       {
-        rel: 'icon',
-        type: 'image/png',
-        sizes: '16x16',
-        href: '/favicon-16.png',
+        rel: "icon",
+        type: "image/png",
+        sizes: "16x16",
+        href: "/favicon-16.png",
       },
       {
-        rel: 'apple-touch-icon',
-        sizes: '180x180',
-        href: '/apple-touch-icon.png',
+        rel: "apple-touch-icon",
+        sizes: "180x180",
+        href: "/apple-touch-icon.png",
       },
     ],
   }),
   shellComponent: RootDocument,
-})
+});
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -180,16 +184,20 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
+        />
         {children}
-        <script dangerouslySetInnerHTML={{ __html: serviceWorkerRegistrationScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: serviceWorkerRegistrationScript }}
+        />
         <TanStackDevtools
           config={{
-            position: 'bottom-right',
+            position: "bottom-right",
           }}
           plugins={[
             {
-              name: 'Tanstack Router',
+              name: "Tanstack Router",
               render: <TanStackRouterDevtoolsPanel />,
             },
           ]}
@@ -197,5 +205,5 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
-  )
+  );
 }

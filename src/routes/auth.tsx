@@ -372,6 +372,15 @@ function AuthRoute() {
         <Link to={redirectPath} className={styles.secondaryLink}>
           {copy.route.authBackToDashboard}
         </Link>
+
+        <nav className={styles.legalLinks} aria-label="Legal links">
+          <Link to="/privacy" className={styles.legalLink}>
+            Privacy Policy
+          </Link>
+          <Link to="/terms" className={styles.legalLink}>
+            Terms of Service
+          </Link>
+        </nav>
       </section>
     </main>
   )
