@@ -8,9 +8,9 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'DISABLE_TANSTACK_DEVTOOLS=1 pnpm reps -- --port 4173 --host 127.0.0.1',
+    command: 'pnpm build && pnpm exec vite preview --port 4173 --host 127.0.0.1',
     port: 4173,
-    timeout: 120_000,
+    timeout: 240_000,
     reuseExistingServer: false,
   },
 })

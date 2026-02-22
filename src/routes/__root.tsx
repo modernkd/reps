@@ -4,6 +4,14 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 
 import appCss from '../styles.css?url'
 
+const appTitle = 'Workout Tracker'
+const appDescription = 'Track workouts, follow plans, and recover skipped days.'
+const socialImagePath = '/og-image.png'
+const socialImageAlt = 'Workout Tracker dashboard preview'
+const siteUrl = import.meta.env.VITE_SITE_URL?.trim().replace(/\/+$/, '') || undefined
+const canonicalUrl = siteUrl ? `${siteUrl}/` : '/'
+const socialImageUrl = siteUrl ? `${siteUrl}${socialImagePath}` : socialImagePath
+
 const themeInitializationScript = `
 (function () {
   var theme = 'dark';
@@ -47,11 +55,75 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Workout Tracker',
+        title: appTitle,
+      },
+      {
+        name: 'description',
+        content: appDescription,
       },
       {
         name: 'theme-color',
         content: '#0f161d',
+      },
+      {
+        property: 'og:type',
+        content: 'website',
+      },
+      {
+        property: 'og:site_name',
+        content: appTitle,
+      },
+      {
+        property: 'og:locale',
+        content: 'en_US',
+      },
+      {
+        property: 'og:title',
+        content: appTitle,
+      },
+      {
+        property: 'og:description',
+        content: appDescription,
+      },
+      {
+        property: 'og:url',
+        content: canonicalUrl,
+      },
+      {
+        property: 'og:image',
+        content: socialImageUrl,
+      },
+      {
+        property: 'og:image:width',
+        content: '1200',
+      },
+      {
+        property: 'og:image:height',
+        content: '630',
+      },
+      {
+        property: 'og:image:alt',
+        content: socialImageAlt,
+      },
+      {
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      },
+      {
+        name: 'twitter:title',
+        content: appTitle,
+      },
+      {
+        name: 'twitter:description',
+        content: appDescription,
+      },
+      {
+        name: 'twitter:image',
+        content: socialImageUrl,
+      },
+      {
+        name: 'twitter:image:alt',
+        content: socialImageAlt,
       },
       {
         name: 'apple-mobile-web-app-capable',
@@ -59,10 +131,14 @@ export const Route = createRootRoute({
       },
       {
         name: 'apple-mobile-web-app-title',
-        content: 'Workout Tracker',
+        content: appTitle,
       },
     ],
     links: [
+      {
+        rel: 'canonical',
+        href: canonicalUrl,
+      },
       {
         rel: 'stylesheet',
         href: appCss,
