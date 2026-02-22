@@ -28,6 +28,102 @@ export type DateRangeInput = {
   to: string
 }
 
+export type ExerciseHistoryEntry = {
+  name: string
+  lastDate: string
+  lastWeightKg: number | null
+}
+
+export type ExerciseRecordLog = {
+  date: string
+  weightKg: number | null
+  setsLogged: number
+}
+
+export type ExerciseProgressSummary = {
+  key: string
+  exerciseId: string
+  name: string
+  lastRecordedAt: string | null
+  lastWeightKg: number | null
+  totalLogs: number
+  logs: ExerciseRecordLog[]
+  weightPoints: Array<{ date: string; value: number }>
+}
+
+function normalizeExerciseName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function getExerciseHistory(workouts: Workout[]): ExerciseHistoryEntry[] {
+  const sortedWorkouts = [...workouts].sort((a, b) =>
+    compareAsc(parseISO(a.date), parseISO(b.date)),
+  )
+  const historyMap = new Map<string, ExerciseHistoryEntry>()
+
+  for (const workout of sortedWorkouts) {
+    const entryDate = parseISO(workout.date)
+    for (const setLog of workout.sessionSummary?.setLogs ?? []) {
+      const name = (setLog.exerciseName ?? fallbackExerciseName(setLog.exerciseId)).trim()
+      if (!name) {
+        continue
+      }
+
+      const normalized = normalizeExerciseName(name)
+      const existing = historyMap.get(normalized)
+
+      if (existing) {
+        const existingDate = parseISO(existing.lastDate)
+        if (compareAsc(entryDate, existingDate) < 0) {
+          continue
+        }
+      }
+
+      historyMap.set(normalized, {
+        name,
+        lastDate: workout.date,
+        lastWeightKg: typeof setLog.weightKg === 'number' ? setLog.weightKg : null,
+      })
+    }
+  }
+
+  return [...historyMap.values()].sort((a, b) =>
+    compareAsc(parseISO(b.lastDate), parseISO(a.lastDate)),
+  )
+}
+
+export function getLatestWeightByExerciseName(workouts: Workout[]): Record<string, number> {
+  const sortedWorkouts = [...workouts].sort((a, b) =>
+    compareAsc(parseISO(a.date), parseISO(b.date)),
+  )
+  const latestByExercise = new Map<string, number>()
+
+  for (const workout of sortedWorkouts) {
+    const byExerciseInWorkout = new Map<string, number>()
+
+    for (const setLog of workout.sessionSummary?.setLogs ?? []) {
+      if (typeof setLog.weightKg !== 'number') {
+        continue
+      }
+
+      const normalizedName = normalizeExerciseName(
+        setLog.exerciseName ?? fallbackExerciseName(setLog.exerciseId),
+      )
+      if (!normalizedName) {
+        continue
+      }
+
+      byExerciseInWorkout.set(normalizedName, setLog.weightKg)
+    }
+
+    for (const [name, weight] of byExerciseInWorkout.entries()) {
+      latestByExercise.set(name, weight)
+    }
+  }
+
+  return Object.fromEntries(latestByExercise)
+}
+
 function fallbackExerciseName(exerciseId: string): string {
   return exerciseId
     .replace(/^ex_/, '')
@@ -35,6 +131,127 @@ function fallbackExerciseName(exerciseId: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+export function getExerciseProgressSummaries(input: {
+  workouts: Workout[]
+  typeIds?: string[]
+  maxWeightPoints?: number
+  availableExerciseNames?: string[]
+}): ExerciseProgressSummary[] {
+  const activeTypes = input.typeIds?.length ? new Set(input.typeIds) : null
+  const byExercise = new Map<string, ExerciseProgressSummary>()
+  const sortedWorkouts = [...input.workouts]
+    .filter((workout) => (activeTypes ? activeTypes.has(workout.type) : true))
+    .sort((a, b) => compareAsc(parseISO(a.date), parseISO(b.date)))
+
+  for (const workout of sortedWorkouts) {
+    const perExercise = new Map<string, ExerciseRecordLog>()
+    const perExerciseNames = new Map<string, string>()
+    const perExerciseIds = new Map<string, string>()
+
+    for (const setLog of workout.sessionSummary?.setLogs ?? []) {
+      const name = (setLog.exerciseName ?? fallbackExerciseName(setLog.exerciseId)).trim()
+      if (!name) {
+        continue
+      }
+
+      const normalized = normalizeExerciseName(name)
+      if (!normalized) {
+        continue
+      }
+
+      const existing = perExercise.get(normalized)
+      const weightValue = typeof setLog.weightKg === 'number' ? setLog.weightKg : null
+      if (!existing) {
+        perExerciseNames.set(normalized, name)
+        perExerciseIds.set(normalized, setLog.exerciseId)
+        perExercise.set(normalized, {
+          date: workout.date,
+          weightKg: weightValue,
+          setsLogged: 1,
+        })
+        continue
+      }
+
+      existing.setsLogged += 1
+      if (weightValue !== null) {
+        existing.weightKg = existing.weightKg === null ? weightValue : Math.max(existing.weightKg, weightValue)
+      }
+    }
+
+    for (const [normalized, log] of perExercise.entries()) {
+      const summary = byExercise.get(normalized)
+      const resolvedName = perExerciseNames.get(normalized) ?? normalized
+      const resolvedId = perExerciseIds.get(normalized) ?? normalized
+
+      if (!summary) {
+        byExercise.set(normalized, {
+          key: normalized,
+          exerciseId: resolvedId,
+          name: resolvedName || normalized,
+          lastRecordedAt: log.date,
+          lastWeightKg: log.weightKg,
+          totalLogs: 1,
+          logs: [log],
+          weightPoints: log.weightKg !== null ? [{ date: log.date, value: log.weightKg }] : [],
+        })
+        continue
+      }
+
+      summary.logs.push(log)
+      summary.totalLogs += 1
+      summary.lastRecordedAt = log.date
+      if (log.weightKg !== null) {
+        summary.lastWeightKg = log.weightKg
+        summary.weightPoints.push({ date: log.date, value: log.weightKg })
+      }
+    }
+  }
+
+  const maxWeightPoints = input.maxWeightPoints ?? 10
+  const summaries = [...byExercise.values()]
+    .map((summary) => ({
+      ...summary,
+      logs: [...summary.logs].sort((a, b) => compareAsc(parseISO(b.date), parseISO(a.date))),
+      weightPoints: summary.weightPoints.slice(-maxWeightPoints),
+    }))
+
+  for (const exerciseName of input.availableExerciseNames ?? []) {
+    const trimmed = exerciseName.trim()
+    if (!trimmed) {
+      continue
+    }
+
+    const key = normalizeExerciseName(trimmed)
+    if (!key || summaries.some((entry) => entry.key === key)) {
+      continue
+    }
+
+    summaries.push({
+      key,
+      exerciseId: key,
+      name: trimmed,
+      lastRecordedAt: null,
+      lastWeightKg: null,
+      totalLogs: 0,
+      logs: [],
+      weightPoints: [],
+    })
+  }
+
+  return summaries.sort((a, b) => {
+    if (a.lastRecordedAt && b.lastRecordedAt) {
+      return compareAsc(parseISO(b.lastRecordedAt), parseISO(a.lastRecordedAt))
+    }
+    if (a.lastRecordedAt) {
+      return -1
+    }
+    if (b.lastRecordedAt) {
+      return 1
+    }
+    return a.name.localeCompare(b.name)
+  })
 }
 
 export function getWorkoutsByDateRange(input: {

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   getCalendarMonthModel,
+  getExerciseProgressSummaries,
+  getLatestWeightByExerciseName,
   getRunProgressSeries,
   getStrengthExerciseNames,
   getStrengthProgressSeries,
@@ -173,5 +175,43 @@ describe('selectors', () => {
 
     expect(paceSeries).toEqual([{ date: '2026-02-05', value: 6 }])
     expect(speedSeries).toEqual([{ date: '2026-02-05', value: 10 }])
+  })
+
+  it('derives latest logged weight per exercise name from latest completed session', () => {
+    const latest = getLatestWeightByExerciseName(workouts)
+
+    expect(latest['bench press']).toBe(120)
+    expect(latest['e2']).toBe(70)
+  })
+
+  it('builds exercise progress summaries ordered by latest log date', () => {
+    const summaries = getExerciseProgressSummaries({ workouts })
+    const bench = summaries.find((entry) => entry.key === 'bench press')
+
+    expect(bench).toBeDefined()
+    expect(bench?.totalLogs).toBe(2)
+    expect(bench?.lastRecordedAt).toBe('2026-02-10')
+    expect(bench?.logs[0]).toEqual({ date: '2026-02-10', weightKg: 120, setsLogged: 1 })
+    expect(bench?.weightPoints.at(-1)).toEqual({ date: '2026-02-10', value: 120 })
+  })
+
+  it('applies workout-type filtering to exercise progress summaries', () => {
+    const summaries = getExerciseProgressSummaries({ workouts, typeIds: ['run'] })
+
+    expect(summaries).toHaveLength(1)
+    expect(summaries[0]?.key).toBe('e2')
+    expect(summaries[0]?.lastWeightKg).toBe(70)
+  })
+
+  it('includes available exercises that have never been logged', () => {
+    const summaries = getExerciseProgressSummaries({
+      workouts,
+      availableExerciseNames: ['Bench Press', 'Lateral Raises'],
+    })
+
+    const lateralRaises = summaries.find((entry) => entry.key === 'lateral raises')
+    expect(lateralRaises).toBeDefined()
+    expect(lateralRaises?.totalLogs).toBe(0)
+    expect(lateralRaises?.lastRecordedAt).toBeNull()
   })
 })

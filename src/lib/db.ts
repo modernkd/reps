@@ -4,18 +4,20 @@ import {
   type Transaction,
 } from '@tanstack/react-db'
 
-import { addDays, isAfter, parseISO } from 'date-fns'
+import { addDays, isAfter, isBefore, isValid, parseISO } from 'date-fns'
 
 import { createId } from './ids'
 import { nowIso, toDateIso } from './date'
 import {
   activeSessionDraftSchema,
+  exerciseCatalogEntrySchema,
   exerciseTemplateSchema,
   planDaySchema,
   planTemplateSchema,
   scheduledSessionSchema,
   type ActiveSessionDraft,
   type ExerciseTemplate,
+  type ExerciseCatalogEntry,
   type PlanDay,
   type PlanTemplate,
   type ScheduledSession,
@@ -23,6 +25,7 @@ import {
   type SessionExercisePlan,
   type SessionPlan,
   type SessionSummary,
+  type PlannedWorkout,
   type Workout,
   type WorkoutIntensity,
   sessionPlanSchema,
@@ -31,6 +34,7 @@ import {
 } from './types'
 import { createStarterTemplateBundle, STARTER_TEMPLATE_ID } from './templates'
 import { inferWorkoutTypeFromPlanDay } from './workoutType'
+import { getAllCatalogExerciseNames } from './variants'
 
 const DEFAULT_WORKOUT_TYPES = [
   { id: 'lift', name: 'Lift', color: '#ef476f' },
@@ -40,6 +44,12 @@ const DEFAULT_WORKOUT_TYPES = [
   { id: 'cardio', name: 'Cardio', color: '#8d99ae' },
   { id: 'strength', name: 'Strength', color: '#f78c6b' },
 ] as const
+
+export const MANUAL_TEMPLATE_ID = 'manual_plan_template'
+export const MANUAL_PLAN_DAY_ID = 'manual_plan_day'
+const MANUAL_PLAN_DAY_LABEL = 'Planned workout'
+export const MIN_TEMPLATE_COUNT = 1
+export const LAST_TEMPLATE_DELETE_ERROR = 'At least one template is required.'
 
 export const workoutTypesCollection = createCollection(
   localStorageCollectionOptions({
@@ -86,6 +96,15 @@ export const exerciseTemplatesCollection = createCollection(
   }),
 )
 
+export const exerciseCatalogCollection = createCollection(
+  localStorageCollectionOptions({
+    id: 'exercise_catalog',
+    storageKey: 'workout-tracker.exercise-catalog.v1',
+    schema: exerciseCatalogEntrySchema,
+    getKey: (item) => item.id,
+  }),
+)
+
 export const scheduledSessionsCollection = createCollection(
   localStorageCollectionOptions({
     id: 'scheduled_sessions',
@@ -127,6 +146,9 @@ planDaysCollection.createIndex((row) => row.templateId, {
 exerciseTemplatesCollection.createIndex((row) => row.planDayId, {
   name: 'exercise_template_plan_day_idx',
 })
+exerciseCatalogCollection.createIndex((row) => row.name, {
+  name: 'exercise_catalog_name_idx',
+})
 
 async function persist(tx: Transaction<Record<string, unknown>>): Promise<void> {
   await tx.isPersisted.promise
@@ -141,6 +163,69 @@ export async function ensureDefaultWorkoutTypes(): Promise<void> {
   }
 
   await persist(workoutTypesCollection.insert(missing))
+}
+
+export async function ensureDefaultExerciseCatalog(): Promise<void> {
+  const existingNames = new Set(
+    exerciseCatalogCollection.toArray.map((entry) => entry.name.trim().toLowerCase()),
+  )
+  const missing = getAllCatalogExerciseNames().filter(
+    (name) => !existingNames.has(name.trim().toLowerCase()),
+  )
+
+  if (missing.length === 0) {
+    return
+  }
+
+  const now = nowIso()
+  const entries: ExerciseCatalogEntry[] = missing.map((name) => ({
+    id: createId('exercise'),
+    name,
+    createdAt: now,
+    updatedAt: now,
+  }))
+
+  await persist(exerciseCatalogCollection.insert(entries))
+}
+
+export async function addExerciseCatalogEntry(name: string): Promise<ExerciseCatalogEntry | null> {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const normalized = trimmed.toLowerCase()
+  const existing = exerciseCatalogCollection.toArray.find(
+    (entry) => entry.name.trim().toLowerCase() === normalized,
+  )
+  if (existing) {
+    return existing
+  }
+
+  const now = nowIso()
+  const entry: ExerciseCatalogEntry = {
+    id: createId('exercise'),
+    name: trimmed,
+    createdAt: now,
+    updatedAt: now,
+  }
+  await persist(exerciseCatalogCollection.insert(entry))
+  return entry
+}
+
+async function ensureManualPlanDay(): Promise<void> {
+  if (planDaysCollection.has(MANUAL_PLAN_DAY_ID)) {
+    return
+  }
+
+  await persist(
+    planDaysCollection.insert({
+      id: MANUAL_PLAN_DAY_ID,
+      templateId: MANUAL_TEMPLATE_ID,
+      weekday: 1,
+      label: MANUAL_PLAN_DAY_LABEL,
+    }),
+  )
 }
 
 export async function addWorkout(input: {
@@ -200,37 +285,193 @@ export async function updateWorkout(
   )
 }
 
-export async function deleteWorkout(id: string): Promise<void> {
+type DeleteWorkoutOptions = {
+  preserveScheduledSession?: boolean
+}
+
+export async function deleteWorkout(
+  id: string,
+  options: DeleteWorkoutOptions = {},
+): Promise<void> {
   const workout = workoutsCollection.get(id)
   await persist(workoutsCollection.delete(id))
 
   if (workout?.scheduledSessionId) {
-    const linkedSession = scheduledSessionsCollection.get(workout.scheduledSessionId)
+    const linkedSessionId = workout.scheduledSessionId
+    const linkedSession = scheduledSessionsCollection.get(linkedSessionId)
     if (linkedSession) {
+      if (options.preserveScheduledSession) {
+        await persist(
+          scheduledSessionsCollection.update(linkedSession.id, (draft) => {
+            draft.status = 'planned'
+            draft.workoutId = undefined
+          }),
+        )
+        return
+      }
+
+      const draftIdsToDelete = activeSessionDraftsCollection.toArray
+        .filter((draft) => draft.sessionId === linkedSessionId)
+        .map((draft) => draft.sessionId)
+      const planIdsToDelete = sessionPlansCollection.toArray
+        .filter((plan) => plan.sessionId === linkedSessionId)
+        .map((plan) => plan.id)
+      const workoutsToDetach = workoutsCollection.toArray.filter(
+        (record) => record.scheduledSessionId === linkedSessionId,
+      )
+
+      for (const detachedWorkout of workoutsToDetach) {
+        await persist(
+          workoutsCollection.update(detachedWorkout.id, (draft) => {
+            draft.scheduledSessionId = undefined
+            draft.updatedAt = nowIso()
+          }),
+        )
+      }
+
+      if (draftIdsToDelete.length > 0) {
+        await persist(activeSessionDraftsCollection.delete(draftIdsToDelete))
+      }
+
+      if (planIdsToDelete.length > 0) {
+        await persist(sessionPlansCollection.delete(planIdsToDelete))
+      }
+
       await persist(
-        scheduledSessionsCollection.update(linkedSession.id, (draft) => {
-          draft.status = 'planned'
-          draft.workoutId = undefined
+        scheduledSessionsCollection.delete([linkedSession.id]),
+      )
+    }
+  }
+}
+
+type ClearDataDirection = 'after' | 'before'
+
+async function clearDataByDate(
+  date: string,
+  direction: ClearDataDirection,
+): Promise<{ workoutsDeleted: number; sessionsDeleted: number }> {
+  const parsedCutoffDate = parseISO(date)
+  const hasValidCutoffDate = isValid(parsedCutoffDate)
+  const isTargetDate = (value: string) => {
+    if (hasValidCutoffDate) {
+      const parsedValue = parseISO(value)
+      if (isValid(parsedValue)) {
+        return direction === 'after'
+          ? isAfter(parsedValue, parsedCutoffDate)
+          : isBefore(parsedValue, parsedCutoffDate)
+      }
+    }
+
+    return direction === 'after' ? value > date : value < date
+  }
+
+  const sessionsToDelete = scheduledSessionsCollection.toArray.filter(
+    (session) => isTargetDate(session.date) && session.status !== 'completed',
+  )
+  const sessionIdsToDelete = new Set(sessionsToDelete.map((session) => session.id))
+  const workoutIdsToDelete = Array.from(
+    new Set(
+      sessionsToDelete
+        .map((session) => session.workoutId)
+        .filter((workoutId): workoutId is string => Boolean(workoutId)),
+    ),
+  ).filter((workoutId) => workoutsCollection.has(workoutId))
+  const workoutIdsToDeleteSet = new Set(workoutIdsToDelete)
+
+  if (workoutIdsToDelete.length > 0) {
+    await persist(workoutsCollection.delete(workoutIdsToDelete))
+  }
+
+  const draftIdsToDelete = activeSessionDraftsCollection.toArray
+    .filter((draft) => sessionIdsToDelete.has(draft.sessionId))
+    .map((draft) => draft.sessionId)
+  const planIdsToDelete = sessionPlansCollection.toArray
+    .filter((plan) => sessionIdsToDelete.has(plan.sessionId))
+    .map((plan) => plan.id)
+  const workoutsToDetach = workoutsCollection.toArray.filter(
+    (workout) =>
+      workout.scheduledSessionId !== undefined &&
+      sessionIdsToDelete.has(workout.scheduledSessionId) &&
+      !workoutIdsToDeleteSet.has(workout.id),
+  )
+
+  for (const workout of workoutsToDetach) {
+    await persist(
+      workoutsCollection.update(workout.id, (draft) => {
+        draft.scheduledSessionId = undefined
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
+  if (draftIdsToDelete.length > 0) {
+    await persist(activeSessionDraftsCollection.delete(draftIdsToDelete))
+  }
+
+  if (planIdsToDelete.length > 0) {
+    await persist(sessionPlansCollection.delete(planIdsToDelete))
+  }
+
+  const sessionIds = Array.from(sessionIdsToDelete)
+  if (sessionIds.length > 0) {
+    await persist(scheduledSessionsCollection.delete(sessionIds))
+  }
+
+  if (direction === 'after') {
+    const templatesToClamp = planTemplatesCollection.toArray.filter(
+      (template) => template.endDate === undefined || template.endDate > date,
+    )
+    for (const template of templatesToClamp) {
+      await persist(
+        planTemplatesCollection.update(template.id, (draft) => {
+          draft.endDate = date
+          draft.updatedAt = nowIso()
         }),
       )
     }
+  } else {
+    const templatesToShift = planTemplatesCollection.toArray.filter(
+      (template) => template.startDate < date,
+    )
+    for (const template of templatesToShift) {
+      await persist(
+        planTemplatesCollection.update(template.id, (draft) => {
+          draft.startDate = date
+          draft.updatedAt = nowIso()
+        }),
+      )
+    }
+  }
+
+  return {
+    workoutsDeleted: workoutIdsToDelete.length,
+    sessionsDeleted: sessionsToDelete.length,
   }
 }
 
 export async function clearDataAfterDate(
   date: string,
 ): Promise<{ workoutsDeleted: number; sessionsDeleted: number }> {
-  const workoutsAfterDate = workoutsCollection.toArray.filter((workout) => workout.date > date)
-  const sessionsAfterDate = scheduledSessionsCollection.toArray.filter(
-    (session) => session.date > date,
-  )
-  const sessionIdsToDelete = new Set(sessionsAfterDate.map((session) => session.id))
+  return clearDataByDate(date, 'after')
+}
 
-  for (const workout of workoutsAfterDate) {
-    await deleteWorkout(workout.id)
+export async function clearDataBeforeDate(
+  date: string,
+): Promise<{ workoutsDeleted: number; sessionsDeleted: number }> {
+  return clearDataByDate(date, 'before')
+}
+
+export async function clearAllUncompletedSessions(): Promise<{ sessionsDeleted: number }> {
+  const sessionsToDelete = scheduledSessionsCollection.toArray.filter(
+    (session) => session.status !== 'completed',
+  )
+  const sessionIdsToDelete = new Set(sessionsToDelete.map((session) => session.id))
+
+  if (sessionIdsToDelete.size === 0) {
+    return { sessionsDeleted: 0 }
   }
 
-  for (const session of sessionsAfterDate) {
+  for (const session of sessionsToDelete) {
     if (!session.workoutId) {
       continue
     }
@@ -277,27 +518,9 @@ export async function clearDataAfterDate(
     await persist(sessionPlansCollection.delete(planIdsToDelete))
   }
 
-  const sessionIds = Array.from(sessionIdsToDelete)
-  if (sessionIds.length > 0) {
-    await persist(scheduledSessionsCollection.delete(sessionIds))
-  }
+  await persist(scheduledSessionsCollection.delete(Array.from(sessionIdsToDelete)))
 
-  const templatesToClamp = planTemplatesCollection.toArray.filter(
-    (template) => template.endDate === undefined || template.endDate > date,
-  )
-  for (const template of templatesToClamp) {
-    await persist(
-      planTemplatesCollection.update(template.id, (draft) => {
-        draft.endDate = date
-        draft.updatedAt = nowIso()
-      }),
-    )
-  }
-
-  return {
-    workoutsDeleted: workoutsAfterDate.length,
-    sessionsDeleted: sessionsAfterDate.length,
-  }
+  return { sessionsDeleted: sessionsToDelete.length }
 }
 
 export async function importStarterTemplate(): Promise<void> {
@@ -441,8 +664,269 @@ export async function createPlanTemplate(input: {
   return template
 }
 
+async function deleteTemplateSessions(templateId: string): Promise<number> {
+  const sessionsToDelete = scheduledSessionsCollection.toArray.filter(
+    (session) => session.templateId === templateId,
+  )
+  const sessionIdsToDelete = new Set(sessionsToDelete.map((session) => session.id))
+
+  if (sessionIdsToDelete.size === 0) {
+    return 0
+  }
+
+  for (const session of sessionsToDelete) {
+    if (!session.workoutId) {
+      continue
+    }
+
+    const linkedWorkout = workoutsCollection.get(session.workoutId)
+    if (!linkedWorkout) {
+      continue
+    }
+
+    await persist(
+      workoutsCollection.update(session.workoutId, (draft) => {
+        draft.scheduledSessionId = undefined
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
+  const draftIdsToDelete = activeSessionDraftsCollection.toArray
+    .filter((draft) => sessionIdsToDelete.has(draft.sessionId))
+    .map((draft) => draft.sessionId)
+  const planIdsToDelete = sessionPlansCollection.toArray
+    .filter((plan) => sessionIdsToDelete.has(plan.sessionId))
+    .map((plan) => plan.id)
+  const workoutsToDetach = workoutsCollection.toArray.filter(
+    (workout) =>
+      workout.scheduledSessionId !== undefined &&
+      sessionIdsToDelete.has(workout.scheduledSessionId),
+  )
+
+  for (const workout of workoutsToDetach) {
+    await persist(
+      workoutsCollection.update(workout.id, (draft) => {
+        draft.scheduledSessionId = undefined
+        draft.updatedAt = nowIso()
+      }),
+    )
+  }
+
+  if (draftIdsToDelete.length > 0) {
+    await persist(activeSessionDraftsCollection.delete(draftIdsToDelete))
+  }
+
+  if (planIdsToDelete.length > 0) {
+    await persist(sessionPlansCollection.delete(planIdsToDelete))
+  }
+
+  await persist(scheduledSessionsCollection.delete(Array.from(sessionIdsToDelete)))
+
+  return sessionsToDelete.length
+}
+
+export async function updatePlanTemplate(input: {
+  templateId: string
+  name: string
+  startDate: string
+  locale?: string
+  days: TemplateDayInput[]
+}): Promise<void> {
+  const now = nowIso()
+  const template = planTemplatesCollection.get(input.templateId)
+  if (!template) {
+    throw new Error('Template not found.')
+  }
+
+  const normalizedName = input.name.trim()
+  if (!normalizedName) {
+    throw new Error('Template name is required.')
+  }
+
+  const normalizedStartDate = input.startDate.trim()
+  if (!normalizedStartDate) {
+    throw new Error('Template start date is required.')
+  }
+
+  const normalizedDays = normalizeTemplateDays(input.days)
+  if (normalizedDays.length === 0) {
+    throw new Error('At least one plan day is required.')
+  }
+
+  await deleteTemplateSessions(template.id)
+
+  const existingPlanDayIds = planDaysCollection.toArray
+    .filter((day) => day.templateId === template.id)
+    .map((day) => day.id)
+  const existingExerciseIds = exerciseTemplatesCollection.toArray
+    .filter((exercise) => existingPlanDayIds.includes(exercise.planDayId))
+    .map((exercise) => exercise.id)
+
+  if (existingExerciseIds.length > 0) {
+    await persist(exerciseTemplatesCollection.delete(existingExerciseIds))
+  }
+  if (existingPlanDayIds.length > 0) {
+    await persist(planDaysCollection.delete(existingPlanDayIds))
+  }
+
+  await persist(
+    planTemplatesCollection.update(template.id, (draft) => {
+      draft.name = normalizedName
+      draft.startDate = normalizedStartDate
+      draft.locale = input.locale ?? draft.locale
+      draft.updatedAt = now
+    }),
+  )
+
+  const planDays: PlanDay[] = []
+  const exercises: ExerciseTemplate[] = []
+
+  for (const day of normalizedDays) {
+    const planDayId = createId('plan_day')
+    planDays.push({
+      id: planDayId,
+      templateId: template.id,
+      weekday: day.weekday,
+      label: day.label,
+    })
+
+    for (const exercise of day.exercises) {
+      exercises.push({
+        id: createId('exercise'),
+        planDayId,
+        name: exercise.name,
+        sets: exercise.sets,
+        minReps: exercise.minReps,
+        maxReps: exercise.maxReps,
+        restSecDefault: exercise.restSecDefault,
+      })
+    }
+  }
+
+  await Promise.all([
+    persist(planDaysCollection.insert(planDays)),
+    persist(exerciseTemplatesCollection.insert(exercises)),
+  ])
+}
+
+export async function deletePlanTemplate(templateId: string): Promise<void> {
+  const template = planTemplatesCollection.get(templateId)
+  if (!template) {
+    return
+  }
+
+  if (planTemplatesCollection.toArray.length <= MIN_TEMPLATE_COUNT) {
+    throw new Error(LAST_TEMPLATE_DELETE_ERROR)
+  }
+
+  await deleteTemplateSessions(template.id)
+
+  const planDayIds = planDaysCollection.toArray
+    .filter((day) => day.templateId === template.id)
+    .map((day) => day.id)
+  const exerciseIds = exerciseTemplatesCollection.toArray
+    .filter((exercise) => planDayIds.includes(exercise.planDayId))
+    .map((exercise) => exercise.id)
+
+  if (exerciseIds.length > 0) {
+    await persist(exerciseTemplatesCollection.delete(exerciseIds))
+  }
+  if (planDayIds.length > 0) {
+    await persist(planDaysCollection.delete(planDayIds))
+  }
+
+  await persist(planTemplatesCollection.delete(template.id))
+}
+
 function scheduledSessionId(templateId: string, planDayId: string, date: string): string {
   return `${templateId}_${planDayId}_${date}`
+}
+
+export async function applyTemplateToCalendar(input: {
+  templateId: string
+  startDate: string
+  to: string
+  startPlanDayId?: string
+}): Promise<{ inserted: number; removed: number }> {
+  const template = planTemplatesCollection.get(input.templateId)
+  if (!template) {
+    return { inserted: 0, removed: 0 }
+  }
+
+  const normalizedStartDate = input.startDate.trim()
+  if (!normalizedStartDate) {
+    throw new Error('Template start date is required.')
+  }
+
+  const templateDays = planDaysCollection.toArray.filter(
+    (day) => day.templateId === input.templateId,
+  )
+  if (templateDays.length === 0) {
+    return { inserted: 0, removed: 0 }
+  }
+
+  if (input.startPlanDayId) {
+    const startPlanDay = templateDays.find((day) => day.id === input.startPlanDayId)
+    if (!startPlanDay) {
+      throw new Error('Template day to start from was not found.')
+    }
+
+    const startDateWeekday = ((parseISO(normalizedStartDate).getDay() + 6) % 7) + 1
+    const weekdayOffset = startDateWeekday - startPlanDay.weekday
+
+    if (weekdayOffset !== 0) {
+      for (const day of templateDays) {
+        const shiftedWeekday = ((day.weekday - 1 + weekdayOffset + 7) % 7) + 1
+        await persist(
+          planDaysCollection.update(day.id, (draft) => {
+            draft.weekday = shiftedWeekday
+          }),
+        )
+      }
+    }
+  }
+
+  const sessionsToRemove = scheduledSessionsCollection.toArray.filter(
+    (session) => session.templateId === input.templateId && !session.workoutId,
+  )
+  const sessionIdsToRemove = sessionsToRemove.map((session) => session.id)
+  const sessionIdSet = new Set(sessionIdsToRemove)
+
+  if (sessionIdsToRemove.length > 0) {
+    const draftIdsToDelete = activeSessionDraftsCollection.toArray
+      .filter((draft) => sessionIdSet.has(draft.sessionId))
+      .map((draft) => draft.sessionId)
+    const planIdsToDelete = sessionPlansCollection.toArray
+      .filter((plan) => sessionIdSet.has(plan.sessionId))
+      .map((plan) => plan.id)
+
+    if (draftIdsToDelete.length > 0) {
+      await persist(activeSessionDraftsCollection.delete(draftIdsToDelete))
+    }
+
+    if (planIdsToDelete.length > 0) {
+      await persist(sessionPlansCollection.delete(planIdsToDelete))
+    }
+
+    await persist(scheduledSessionsCollection.delete(sessionIdsToRemove))
+  }
+
+  await persist(
+    planTemplatesCollection.update(input.templateId, (draft) => {
+      draft.startDate = normalizedStartDate
+      draft.endDate = undefined
+      draft.updatedAt = nowIso()
+    }),
+  )
+
+  const inserted = await generateScheduleForRange({
+    templateId: input.templateId,
+    from: normalizedStartDate,
+    to: input.to,
+  })
+
+  return { inserted, removed: sessionIdsToRemove.length }
 }
 
 export async function generateScheduleForRange(input: {
@@ -506,6 +990,85 @@ export async function generateScheduleForRange(input: {
   }
 
   return recordsToInsert.length
+}
+
+export async function planManualWorkout(input: {
+  date: string
+} & PlannedWorkout): Promise<ScheduledSession> {
+  const normalizedDate = input.date.trim()
+  if (!normalizedDate) {
+    throw new Error('Date is required.')
+  }
+
+  await ensureManualPlanDay()
+
+  const id = scheduledSessionId(MANUAL_TEMPLATE_ID, MANUAL_PLAN_DAY_ID, normalizedDate)
+  if (scheduledSessionsCollection.has(id)) {
+    throw new Error('A planned workout already exists for that day.')
+  }
+
+  const session: ScheduledSession = {
+    id,
+    templateId: MANUAL_TEMPLATE_ID,
+    planDayId: MANUAL_PLAN_DAY_ID,
+    date: normalizedDate,
+    status: 'planned',
+    plannedWorkout: {
+      type: input.type,
+      durationMin: input.durationMin,
+      targetWeightKg: input.targetWeightKg,
+      distanceKm: input.distanceKm,
+      intensity: input.intensity,
+      notes: input.notes,
+    },
+  }
+
+  await persist(scheduledSessionsCollection.insert(session))
+  return session
+}
+
+export async function duplicateScheduledSession(
+  sessionId: string,
+  date: string,
+): Promise<ScheduledSession> {
+  const nextDate = date.trim()
+  if (!nextDate) {
+    throw new Error('Date is required.')
+  }
+
+  const session = scheduledSessionsCollection.get(sessionId)
+  if (!session) {
+    throw new Error('Scheduled session not found.')
+  }
+
+  const nextId = scheduledSessionId(session.templateId, session.planDayId, nextDate)
+  if (scheduledSessionsCollection.has(nextId)) {
+    throw new Error('A session already exists for that day.')
+  }
+
+  const duplicated: ScheduledSession = {
+    ...session,
+    id: nextId,
+    date: nextDate,
+    status: 'planned',
+    workoutId: undefined,
+  }
+
+  await persist(scheduledSessionsCollection.insert(duplicated))
+
+  const existingPlan = sessionPlansCollection.get(sessionId)
+  if (existingPlan) {
+    const duplicatedPlan: SessionPlan = {
+      ...existingPlan,
+      id: nextId,
+      sessionId: nextId,
+      updatedAt: nowIso(),
+    }
+
+    await persist(sessionPlansCollection.insert(duplicatedPlan))
+  }
+
+  return duplicated
 }
 
 export async function updateScheduledSessionStatus(
@@ -607,12 +1170,17 @@ export async function completeGuidedSession(input: {
     : exerciseTemplatesCollection.toArray.filter(
         (item) => item.planDayId === session.planDayId,
       )
+  const plannedWorkout = session.plannedWorkout
 
   const workout = await addWorkout({
     date: session.date,
-    type: inferWorkoutTypeFromPlanDay(planDay),
-    durationMin: estimateDurationFromSetLogs(exercises, input.summary),
-    notes: input.notes ?? sessionPlan?.notes,
+    type: plannedWorkout?.type ?? inferWorkoutTypeFromPlanDay(planDay),
+    durationMin:
+      plannedWorkout?.durationMin ?? estimateDurationFromSetLogs(exercises, input.summary),
+    targetWeightKg: plannedWorkout?.targetWeightKg,
+    distanceKm: plannedWorkout?.distanceKm,
+    intensity: plannedWorkout?.intensity,
+    notes: input.notes ?? plannedWorkout?.notes ?? sessionPlan?.notes,
     scheduledSessionId: session.id,
     sessionSummary: input.summary,
   })
@@ -693,7 +1261,7 @@ export async function resetCompletedSession(sessionId: string): Promise<void> {
   }
 
   if (session.workoutId && workoutsCollection.has(session.workoutId)) {
-    await deleteWorkout(session.workoutId)
+    await deleteWorkout(session.workoutId, { preserveScheduledSession: true })
     return
   }
 
@@ -713,6 +1281,7 @@ function toSessionExercisePlan(exercise: ExerciseTemplate): SessionExercisePlan 
     minReps: exercise.minReps,
     maxReps: exercise.maxReps,
     restSecDefault: exercise.restSecDefault,
+    targetMassKg: exercise.targetMassKg,
   }
 }
 

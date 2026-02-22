@@ -19,6 +19,8 @@ const VARIANT_CATALOG: Record<string, string[]> = {
   ex_hip_thrust: ['Hip Thrust', 'Glute Bridge', 'Smith Hip Thrust'],
   ex_leg_extension: ['Leg Extension', 'Sissy Squat', 'Spanish Squat'],
   ex_seated_calf_raise: ['Seated Calf Raise', 'Leg Press Calf Raise', 'Standing Calf Raise'],
+  ex_biceps_curl: ['Biceps Curl', 'Barbell Curl', 'Preacher Curl', 'Concentration Curl'],
+  ex_triceps_pushdown: ['Triceps Pushdown', 'Rope Pushdown', 'Straight Bar Pushdown', 'V-Bar Pushdown'],
 }
 
 function normalizeVariant(value: string): string {
@@ -43,4 +45,35 @@ export function isCustomExerciseVariant(exerciseId: string, exerciseName: string
 
   const knownVariants = getCatalogExerciseVariants(exerciseId)
   return !knownVariants.some((variant) => normalizeVariant(variant) === normalizedName)
+}
+
+export function getAllCatalogExerciseNames(): string[] {
+  const names = new Set<string>()
+  for (const variants of Object.values(VARIANT_CATALOG)) {
+    for (const variant of variants) {
+      const trimmed = variant.trim()
+      if (trimmed) {
+        names.add(trimmed)
+      }
+    }
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b))
+}
+
+export function getCatalogExerciseIdByName(exerciseName: string): string | null {
+  const normalized = normalizeVariant(exerciseName)
+  if (!normalized) {
+    return null
+  }
+
+  for (const [exerciseId, variants] of Object.entries(VARIANT_CATALOG)) {
+    for (const variant of variants) {
+      if (normalizeVariant(variant) === normalized) {
+        return exerciseId
+      }
+    }
+  }
+
+  return null
 }

@@ -73,8 +73,17 @@ export const exerciseTemplateSchema = z.object({
   minReps: z.number().int().positive().optional(),
   maxReps: z.number().int().positive().optional(),
   restSecDefault: z.number().int().positive().optional(),
+  targetMassKg: z.number().positive().optional(),
 })
 export type ExerciseTemplate = z.infer<typeof exerciseTemplateSchema>
+
+export const exerciseCatalogEntrySchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type ExerciseCatalogEntry = z.infer<typeof exerciseCatalogEntrySchema>
 
 export const scheduledSessionStatusSchema = z.enum([
   'planned',
@@ -84,6 +93,16 @@ export const scheduledSessionStatusSchema = z.enum([
 ])
 export type ScheduledSessionStatus = z.infer<typeof scheduledSessionStatusSchema>
 
+export const plannedWorkoutSchema = z.object({
+  type: z.string(),
+  durationMin: z.number().int().positive(),
+  targetWeightKg: z.number().positive().optional(),
+  distanceKm: z.number().positive().optional(),
+  intensity: intensitySchema.optional(),
+  notes: z.string().max(1000).optional(),
+})
+export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>
+
 export const scheduledSessionSchema = z.object({
   id: z.string(),
   templateId: z.string(),
@@ -91,6 +110,7 @@ export const scheduledSessionSchema = z.object({
   date: z.string(),
   status: scheduledSessionStatusSchema,
   workoutId: z.string().optional(),
+  plannedWorkout: plannedWorkoutSchema.optional(),
 })
 export type ScheduledSession = z.infer<typeof scheduledSessionSchema>
 
@@ -114,6 +134,7 @@ export const sessionExercisePlanSchema = z.object({
   minReps: z.number().int().positive().optional(),
   maxReps: z.number().int().positive().optional(),
   restSecDefault: z.number().int().positive().optional(),
+  targetMassKg: z.number().positive().optional(),
 })
 export type SessionExercisePlan = z.infer<typeof sessionExercisePlanSchema>
 
