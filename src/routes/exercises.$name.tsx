@@ -2,11 +2,14 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { useLiveQuery } from '@tanstack/react-db'
 import { format, parseISO } from 'date-fns'
 import { z } from 'zod'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { workoutsCollection, workoutTypesCollection } from '@/lib/db'
+import {
+  getExerciseDetailSeedNames,
+  resolveExerciseDetailEntry,
+} from '@/lib/exerciseDetailRoute'
 import { getExerciseProgressSummaries } from '@/lib/selectors'
-import type { ExerciseProgressSummary } from '@/lib/selectors'
 import { getCopy, getDateLocale, type AppLanguage } from '@/lib/i18n'
 import { resolveExerciseReferenceContent, resolveFreeExerciseDbEntry } from '@/lib/exerciseImages'
 import type { FreeExerciseDbEntry } from '@/lib/exerciseImages'
@@ -21,6 +24,7 @@ const searchSchema = z.object({
   exEquipment: z.string().optional(),
   exDifficulty: z.string().optional(),
   exCategory: z.string().optional(),
+  entryKey: z.string().optional(),
 })
 
 const INITIAL_VISIBLE_LOGS = 3
@@ -74,6 +78,15 @@ function ExerciseDetailPage() {
     const variants = getCatalogExerciseVariants(exerciseKey)
     return variants.length > 0 ? variants[0] : exerciseKey
   }, [exerciseKey])
+  const detailSeedNames = useMemo(
+    () =>
+      getExerciseDetailSeedNames({
+        routeName: exerciseKey,
+        fallbackName: fallbackExerciseName,
+        entryKey: search.entryKey,
+      }),
+    [exerciseKey, fallbackExerciseName, search.entryKey],
+  )
 
   const entries = useMemo(
     () =>
@@ -81,17 +94,19 @@ function ExerciseDetailPage() {
         workouts,
         typeIds: selectedTypeIds,
         maxWeightPoints: MAX_WEIGHT_POINTS,
-        availableExerciseNames: [fallbackExerciseName],
+        availableExerciseNames: detailSeedNames,
       }),
-    [selectedTypeIds, workouts, fallbackExerciseName],
+    [detailSeedNames, selectedTypeIds, workouts],
   )
 
-  const entry = entries.find(
-    (e) =>
-      e.key === exerciseKey ||
-      e.exerciseId === exerciseKey ||
-      getCatalogExerciseIdByName(e.name) === exerciseKey ||
-      e.name === exerciseKey,
+  const entry = useMemo(
+    () =>
+      resolveExerciseDetailEntry({
+        entries,
+        routeName: exerciseKey,
+        entryKey: search.entryKey,
+      }),
+    [entries, exerciseKey, search.entryKey],
   )
 
   const [visibleLogs, setVisibleLogs] = useState(INITIAL_VISIBLE_LOGS)
@@ -104,19 +119,21 @@ function ExerciseDetailPage() {
     >
   } | null>(null)
 
-  useMemo(() => {
+  useEffect(() => {
     if (!entry) {
+      setReferenceContent(null)
       return
     }
 
     const exerciseImageId = getCatalogExerciseIdByName(entry.name)
     const fallbackId = exerciseImageId ?? 'ex_bench_press'
+    let cancelled = false
 
     Promise.all([
       resolveExerciseReferenceContent(fallbackId, entry.name),
       resolveFreeExerciseDbEntry(entry.name),
     ]).then(([content, dbEntry]) => {
-      if (!content) {
+      if (!content || cancelled) {
         return
       }
 
@@ -136,6 +153,9 @@ function ExerciseDetailPage() {
           : undefined,
       })
     })
+    return () => {
+      cancelled = true
+    }
   }, [entry])
 
   if (!entry) {
