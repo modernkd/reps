@@ -80,4 +80,22 @@ describe('exerciseImages', () => {
       instructions: [],
     })
   })
+
+  it('resolves image content by exercise-db name match before bench fallback', async () => {
+    const result = await resolveExerciseReferenceContent('', 'Skull Crushers')
+
+    expect(result?.source).toBe('db')
+    expect(result?.images[0]).toBe('/images/exercises/ex_skull_crusher_0.webp')
+    expect((result?.instructions.length ?? 0) > 0).toBe(true)
+  })
+
+  it('uses bench fallback when both exercise ID and catalog lookup are unavailable', async () => {
+    const result = await resolveExerciseReferenceContent('', 'Totally Unknown Exercise')
+
+    expect(result).toEqual({
+      source: 'db',
+      images: ['/images/exercises/ex_bench_press_0.webp'],
+      instructions: [],
+    })
+  })
 })

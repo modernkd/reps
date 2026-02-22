@@ -48,6 +48,18 @@ function normalizeString(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+function compactNormalized(value: string): string {
+  return normalizeString(value).replace(/[^a-z0-9]+/g, '')
+}
+
+function singularizeCompact(value: string): string {
+  if (value.endsWith('s') && value.length > 3) {
+    return value.slice(0, -1)
+  }
+
+  return value
+}
+
 function normalizeOptional(value: string | undefined): string | null {
   if (!value) {
     return null
@@ -412,6 +424,21 @@ export async function getExerciseByName(
       normalizedQuery.includes(normalizedName)
     ) {
       return exercise
+    }
+  }
+
+  // Compact fallback handles punctuation/plural differences
+  // such as "Skull Crushers" vs "EZ-Bar Skullcrusher".
+  const queryCompact = singularizeCompact(compactNormalized(name))
+  if (queryCompact) {
+    for (const exercise of indexes.byNormalizedName.values()) {
+      const candidateCompact = singularizeCompact(compactNormalized(exercise.name))
+      if (
+        candidateCompact.includes(queryCompact) ||
+        queryCompact.includes(candidateCompact)
+      ) {
+        return exercise
+      }
     }
   }
 

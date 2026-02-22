@@ -22,7 +22,7 @@ function summary(overrides: Partial<ExerciseProgressSummary>): ExerciseProgressS
 }
 
 describe('exerciseDetailRoute', () => {
-  it('keeps catalog route ids while preserving selected variant keys', () => {
+  it('keeps non-catalog exercises as their own route keys', () => {
     const target = buildExerciseDetailTarget({
       key: 'arnold press',
       exerciseId: 'arnold press',
@@ -30,12 +30,12 @@ describe('exerciseDetailRoute', () => {
     })
 
     expect(target).toEqual({
-      routeName: 'ex_overhead_press',
-      entryKey: 'arnold press',
+      routeName: 'arnold press',
+      entryKey: undefined,
     })
   })
 
-  it('resolves the explicitly selected variant entry first', () => {
+  it('resolves the matching route-name entry first', () => {
     const entries = [
       summary({
         key: 'shoulder press',
@@ -51,8 +51,7 @@ describe('exerciseDetailRoute', () => {
 
     const entry = resolveExerciseDetailEntry({
       entries,
-      routeName: 'ex_overhead_press',
-      entryKey: 'arnold press',
+      routeName: 'arnold press',
     })
 
     expect(entry?.name).toBe('Arnold Press')

@@ -1,7 +1,8 @@
-import { isCustomExerciseVariant } from './variants'
+import { getCatalogExerciseIdByName, isCustomExerciseVariant } from './variants'
 import { defaultExercisesData } from './defaultExercisesData'
 
 const CUSTOM_IMAGE_STORAGE_KEY = 'workout-tracker.custom-exercise-images.v1'
+const LOCAL_FALLBACK_EXERCISE_ID = 'ex_bench_press'
 
 export type ExerciseReferenceImage = {
   url: string
@@ -151,6 +152,19 @@ function buildFreeExerciseImageUrl(path: string): string {
   return `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${path}`
 }
 
+function resolveExerciseImagePath(path: string): string {
+  const trimmed = path.trim()
+  if (!trimmed) {
+    return trimmed
+  }
+
+  if (trimmed.startsWith('/images/') || /^https?:\/\//.test(trimmed)) {
+    return trimmed
+  }
+
+  return buildFreeExerciseImageUrl(trimmed)
+}
+
 function matchFreeExerciseEntry(
   db: FreeExerciseDbEntry[],
   exerciseName: string,
@@ -202,6 +216,7 @@ export async function resolveExerciseReferenceContent(
   if (!normalizedName) {
     return undefined
   }
+  const normalizedExerciseId = exerciseId.trim()
 
   const uploaded = getUploadedExerciseImage(exerciseName)
   if (uploaded) {
@@ -217,8 +232,8 @@ export async function resolveExerciseReferenceContent(
     return cachedContent
   }
 
-  if (exerciseId && defaultExercisesData[exerciseId]) {
-    const data = defaultExercisesData[exerciseId]
+  if (normalizedExerciseId && defaultExercisesData[normalizedExerciseId]) {
+    const data = defaultExercisesData[normalizedExerciseId]
     const images = data.images || []
     const instructions = (data.instructions || []).map((i: string) => i.trim()).filter((i: string) => i.length > 0)
 
@@ -242,7 +257,7 @@ export async function resolveExerciseReferenceContent(
       matchedDbExercise.images
         ?.map((path) => path.trim())
         .filter((path) => path.length > 0)
-        .map(buildFreeExerciseImageUrl) ?? []
+        .map(resolveExerciseImagePath) ?? []
     const instructions =
       matchedDbExercise.instructions
         ?.map((instruction) => instruction.trim())
@@ -261,7 +276,11 @@ export async function resolveExerciseReferenceContent(
   }
 
   // Keep custom variants resilient when remote image URLs cannot be used.
-  if (isCustomExerciseVariant(exerciseId, exerciseName) && matchedDbExercise?.images?.length) {
+  if (
+    normalizedExerciseId &&
+    isCustomExerciseVariant(normalizedExerciseId, exerciseName) &&
+    matchedDbExercise?.images?.length
+  ) {
     const firstImagePath = matchedDbExercise.images[0]
     if (firstImagePath) {
       const base64 = await fetchImageAsBase64(buildFreeExerciseImageUrl(firstImagePath))
@@ -284,9 +303,14 @@ export async function resolveExerciseReferenceContent(
     }
   }
 
+  const fallbackExerciseId =
+    normalizedExerciseId ||
+    getCatalogExerciseIdByName(exerciseName) ||
+    LOCAL_FALLBACK_EXERCISE_ID
+
   const fallback: ExerciseReferenceContent = {
     source: 'db', // default fallback assumes these are our static images
-    images: [`/images/exercises/${exerciseId}_0.webp`],
+    images: [`/images/exercises/${fallbackExerciseId}_0.webp`],
     instructions: [],
   }
   exerciseReferenceContentCache.set(normalizedName, fallback)

@@ -34,7 +34,7 @@ import {
 } from './types'
 import { createStarterTemplateBundle, STARTER_TEMPLATE_ID } from './templates'
 import { inferWorkoutTypeFromPlanDay } from './workoutType'
-import { getAllCatalogExerciseNames } from './variants'
+import { getAllExerciseNames } from './exerciseDb'
 
 const DEFAULT_WORKOUT_TYPES = [
   { id: 'lift', name: 'Lift', color: '#ef476f' },
@@ -169,7 +169,8 @@ export async function ensureDefaultExerciseCatalog(): Promise<void> {
   const existingNames = new Set(
     exerciseCatalogCollection.toArray.map((entry) => entry.name.trim().toLowerCase()),
   )
-  const missing = getAllCatalogExerciseNames().filter(
+  const catalogNames = await getAllExerciseNames()
+  const missing = catalogNames.filter(
     (name) => !existingNames.has(name.trim().toLowerCase()),
   )
 

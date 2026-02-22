@@ -16,16 +16,22 @@
 
 .control input {
   width: 100%;
-  border-radius: var(--radius-control);
+  border-radius: 0.2rem;
   border: 1px solid var(--ink-250);
   background: var(--surface-1);
   color: var(--ink-900);
-  padding: 0.48rem 0.78rem;
+  padding: 0.62rem 0.9rem;
   font-size: 0.9rem;
+  min-height: 2.55rem;
+}
+
+.control input::placeholder {
+  color: var(--ink-500);
+  opacity: 1;
 }
 
 .control input:focus-visible {
-  outline: 2px solid var(--accent-500);
+  outline: 2px solid var(--ink-500);
   outline-offset: 2px;
 }
 .listbox {
@@ -36,37 +42,63 @@
   max-height: 14rem;
   overflow: auto;
   margin: 0;
-  padding: 0.3rem;
-  border-radius: 0.7rem;
+  padding: 0.15rem 0;
+  border-radius: 0.2rem;
   border: 1px solid var(--ink-250);
-  background: var(--surface-0);
-  box-shadow: var(--shadow-2);
+  background: var(--surface-1);
+  box-shadow: none;
   list-style: none;
-  z-index: 10;
+  z-index: 20;
 }
 
 .option {
   margin: 0;
+  border: 0;
+  position: relative;
+}
+
+.option + .option {
+  border-top: 0;
+}
+
+.option + .option::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.9rem;
+  right: 0.9rem;
+  border-top: 1px solid var(--ink-160);
 }
 
 .option button {
   width: 100%;
   border: 0;
-  border-radius: 0.52rem;
+  border-radius: 0;
   background: transparent;
   color: var(--ink-900);
   cursor: pointer;
   font-size: 0.86rem;
   line-height: 1.35;
-  padding: 0.38rem 0.45rem;
+  padding: 0.68rem 0.9rem;
   text-align: left;
+  transition: background-color 0.12s ease;
 }
 
 .option button:focus-visible {
-  outline: 2px solid var(--accent-500);
-  outline-offset: 1px;
+  outline: none;
+  color: var(--ink-950);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
 }
+
 .option button:hover {
-  outline: 2px solid var(--accent-400);
-  outline-offset: 1px;
+  background: transparent;
+  color: var(--ink-950);
+}
+
+.optionActive button {
+  background: transparent;
+  color: var(--ink-950);
+  font-weight: 600;
 }

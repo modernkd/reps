@@ -40,7 +40,6 @@
 .chroma-card:hover {
   border-color: color-mix(in oklab, var(--card-border) 45%, var(--ink-220));
   box-shadow: var(--shadow-2);
-  transform: translateY(-1px);
 }
 
 .chroma-card:focus-visible {

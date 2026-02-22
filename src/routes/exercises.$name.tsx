@@ -30,7 +30,7 @@ const searchSchema = z.object({
 const INITIAL_VISIBLE_LOGS = 3
 const LOAD_MORE_STEP = 3
 const MAX_WEIGHT_POINTS = 10
-const FALLBACK_IMAGE = '/images/exercises/ex_bench_press.webp'
+const FALLBACK_IMAGE = '/images/exercises/ex_bench_press_0.webp'
 
 function getPreferredLanguage(): AppLanguage {
   if (typeof window === 'undefined') {
@@ -126,14 +126,19 @@ function ExerciseDetailPage() {
     }
 
     const exerciseImageId = getCatalogExerciseIdByName(entry.name)
-    const fallbackId = exerciseImageId ?? 'ex_bench_press'
     let cancelled = false
+    setReferenceContent(null)
 
     Promise.all([
-      resolveExerciseReferenceContent(fallbackId, entry.name),
+      resolveExerciseReferenceContent(exerciseImageId ?? '', entry.name),
       resolveFreeExerciseDbEntry(entry.name),
     ]).then(([content, dbEntry]) => {
-      if (!content || cancelled) {
+      if (cancelled) {
+        return
+      }
+
+      if (!content) {
+        setReferenceContent(null)
         return
       }
 
@@ -188,7 +193,7 @@ function ExerciseDetailPage() {
   const detailViewCopy = copy.historyView.detailView
   const exerciseImageId = getCatalogExerciseIdByName(entry.name)
   const fallbackImage = exerciseImageId
-    ? `/images/exercises/${exerciseImageId}.webp`
+    ? `/images/exercises/${exerciseImageId}_0.webp`
     : FALLBACK_IMAGE
   const detailImages = referenceContent?.images?.length ? referenceContent.images : [fallbackImage]
   const detailLastRecorded = entry.lastRecordedAt

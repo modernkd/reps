@@ -19,7 +19,7 @@ import { getCatalogExerciseIdByName } from "@/lib/variants";
 const INITIAL_VISIBLE_LOGS = 3;
 const LOAD_MORE_STEP = 3;
 const MAX_WEIGHT_POINTS = 10;
-const FALLBACK_IMAGE = "/images/exercises/ex_bench_press.webp";
+const FALLBACK_IMAGE = "/images/exercises/ex_bench_press_0.webp";
 
 export type ExerciseViewFilters = {
   muscle?: string;
@@ -264,9 +264,8 @@ export function ExerciseHistoryView({
     Promise.all(
       entries.map(async (entry) => {
         const exerciseImageId = getCatalogExerciseIdByName(entry.name);
-        const fallbackId = exerciseImageId ?? "ex_bench_press";
         const [content, dbEntry] = await Promise.all([
-          resolveExerciseReferenceContent(fallbackId, entry.name),
+          resolveExerciseReferenceContent(exerciseImageId ?? "", entry.name),
           resolveFreeExerciseDbEntry(entry.name),
         ]);
         return [entry.key, content, dbEntry] as const;
@@ -574,7 +573,7 @@ export function ExerciseHistoryView({
     const referenceContent = referenceContentByExercise[entry.key];
     const exerciseImageId = getCatalogExerciseIdByName(entry.name);
     const fallbackImage = exerciseImageId
-      ? `/images/exercises/${exerciseImageId}.webp`
+      ? `/images/exercises/${exerciseImageId}_0.webp`
       : FALLBACK_IMAGE;
     const referenceImages = referenceContent?.images.length
       ? referenceContent.images
