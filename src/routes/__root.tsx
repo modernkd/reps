@@ -11,42 +11,41 @@ const socialImagePath = "/og-image.png";
 const socialImageAlt = "Reps dashboard preview";
 const siteUrl =
   import.meta.env.VITE_SITE_URL?.trim().replace(/\/+$/, "") || undefined;
+const supabaseOrigin = (() => {
+  const raw = import.meta.env.VITE_SUPABASE_URL?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+})();
 const canonicalUrl = siteUrl ? `${siteUrl}/` : "/";
 const socialImageUrl = siteUrl
   ? `${siteUrl}${socialImagePath}`
   : socialImagePath;
-
-const themeInitializationScript = `
-(function () {
-  var theme = 'dark';
-  try {
-    var storedTheme = window.localStorage.getItem('workout-tracker-theme');
-    if (storedTheme === 'light' || storedTheme === 'dark') {
-      theme = storedTheme;
-    }
-  } catch (_) {
-    // Ignore read errors.
-  }
-
-  document.documentElement.setAttribute('data-theme', theme);
-  document.documentElement.style.colorScheme = theme;
-
-  var themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) {
-    themeMeta.setAttribute('content', theme === 'dark' ? '#1a1c24' : '#fbfcff');
-  }
-})();
-`;
-
-const serviceWorkerRegistrationScript = `
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js').catch(function () {
-      // Best-effort registration only.
-    });
-  });
-}
-`;
+const cspConnectSrc = [
+  "'self'",
+  "https://raw.githubusercontent.com",
+  ...(supabaseOrigin ? [supabaseOrigin] : []),
+].join(" ");
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https://raw.githubusercontent.com",
+  `connect-src ${cspConnectSrc}`,
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+].join("; ");
 
 export const Route = createRootRoute({
   head: () => ({
@@ -182,26 +181,30 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <meta httpEquiv="Content-Security-Policy" content={contentSecurityPolicy} />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+        <meta
+          httpEquiv="Permissions-Policy"
+          content="camera=(), microphone=(), geolocation=()"
+        />
       </head>
       <body>
-        <script
-          dangerouslySetInnerHTML={{ __html: themeInitializationScript }}
-        />
+        <script src="/theme-init.js" />
         {children}
-        <script
-          dangerouslySetInnerHTML={{ __html: serviceWorkerRegistrationScript }}
-        />
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "Tanstack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
+        <script src="/sw-register.js" />
+        {import.meta.env.DEV ? (
+          <TanStackDevtools
+            config={{
+              position: "bottom-right",
+            }}
+            plugins={[
+              {
+                name: "Tanstack Router",
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+        ) : null}
         <Scripts />
       </body>
     </html>
