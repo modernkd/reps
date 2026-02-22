@@ -8,6 +8,8 @@ import styles from "./styles/AppHeader.module.css";
 type AppHeaderProps = {
   view: "calendar" | "graph" | "exercises";
   language: AppLanguage;
+  greetingName?: string | null;
+  isSignedIn?: boolean;
   templates: Array<{ id: string; name: string }>;
   activeTemplateId?: string;
   onViewChange: (view: "calendar" | "graph" | "exercises") => void;
@@ -17,12 +19,14 @@ type AppHeaderProps = {
   onOpenEditTemplate: (templateId: string) => void;
   onOpenDuplicateTemplate: (templateId: string) => void;
   onDeleteTemplate: (templateId: string) => void;
-  onOpenCreateWorkout: () => void;
+  onOpenAuth: () => void;
 };
 
 export function AppHeader({
   view,
   language,
+  greetingName,
+  isSignedIn = false,
   templates,
   activeTemplateId,
   onViewChange,
@@ -32,7 +36,7 @@ export function AppHeader({
   onOpenEditTemplate,
   onOpenDuplicateTemplate,
   onDeleteTemplate,
-  onOpenCreateWorkout,
+  onOpenAuth,
 }: AppHeaderProps) {
   const copy = getCopy(language);
   const canDeleteTemplate = templates.length > 1;
@@ -54,6 +58,11 @@ export function AppHeader({
       <div>
         <p className={styles.kicker}>{copy.appHeader.kicker}</p>
         <h1>{copy.appHeader.title}</h1>
+        {greetingName ? (
+          <p className={styles.greeting}>
+            {copy.appHeader.greeting(greetingName)}
+          </p>
+        ) : null}
       </div>
 
       <div className={styles.controls}>
@@ -210,6 +219,10 @@ export function AppHeader({
           onClick={onApplyTemplateToCalendar}
         >
           {copy.appHeader.addTemplateToCalendar}
+        </button>
+
+        <button type="button" className={styles.secondary} onClick={onOpenAuth}>
+          {isSignedIn ? copy.appHeader.account : copy.appHeader.login}
         </button>
       </div>
     </header>

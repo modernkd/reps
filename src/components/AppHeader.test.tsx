@@ -6,11 +6,15 @@ import { AppHeader } from './AppHeader'
 function renderHeader(overrides?: {
   templates?: Array<{ id: string; name: string }>
   activeTemplateId?: string
+  greetingName?: string | null
+  isSignedIn?: boolean
 }) {
   const templates = overrides?.templates ?? [{ id: 'template-1', name: 'Template 1' }]
   const props = {
     view: 'calendar' as const,
     language: 'en' as const,
+    greetingName: overrides?.greetingName ?? null,
+    isSignedIn: overrides?.isSignedIn ?? false,
     templates,
     activeTemplateId: overrides?.activeTemplateId ?? templates[0]?.id,
     onViewChange: vi.fn(),
@@ -20,7 +24,7 @@ function renderHeader(overrides?: {
     onOpenEditTemplate: vi.fn(),
     onOpenDuplicateTemplate: vi.fn(),
     onDeleteTemplate: vi.fn(),
-    onOpenCreateWorkout: vi.fn(),
+    onOpenAuth: vi.fn(),
   }
 
   render(<AppHeader {...props} />)
@@ -111,11 +115,18 @@ describe('AppHeader', () => {
     expect(props.onTemplateChange).toHaveBeenCalledWith('template-1')
   })
 
-  it('requests add workout when primary action is clicked', () => {
+  it('opens auth page from Login button', () => {
     const props = renderHeader()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add workout' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
-    expect(props.onOpenCreateWorkout).toHaveBeenCalledTimes(1)
+    expect(props.onOpenAuth).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows account label and greeting when signed in', () => {
+    renderHeader({ isSignedIn: true, greetingName: 'Jordan' })
+
+    expect(screen.getByText('Hi, Jordan!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument()
   })
 })

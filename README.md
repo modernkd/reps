@@ -9,6 +9,25 @@ pnpm install
 pnpm dev
 ```
 
+## Free Cross-Device Sync (Supabase)
+
+This app can stay local-first, and optionally sync across devices using Supabase free tier.
+
+1. Create a free Supabase project.
+2. In Supabase SQL Editor, run `supabase/workout_sync.sql`.
+3. In Supabase Auth, enable Email/Password sign-in.
+4. Add client env vars:
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY
+```
+
+When these env vars are present, the dashboard shows a Cloud Sync panel:
+- Sign in or sign up.
+- On first sign-in on a device, cloud data is pulled down. If no cloud data exists yet, local data is pushed.
+- While signed in, local changes auto-sync to the cloud.
+
 # Building For Production
 
 To build this application for production:

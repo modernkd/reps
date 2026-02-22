@@ -1,0 +1,120 @@
+.panel {
+  border: 1px solid var(--ink-220);
+  border-radius: 7px;
+  background: var(--surface-0);
+  box-shadow: var(--shadow-1);
+  padding: 0.8rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.header {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-family: 'Barlow', 'Segoe UI', sans-serif;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.header p {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 0.8rem;
+}
+
+.form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.82rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--ink-700);
+}
+
+.form input {
+  border: 1px solid var(--ink-220);
+  border-radius: var(--radius-control);
+  background: var(--surface-1);
+  color: var(--ink-900);
+  min-height: 2.2rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.actions button {
+  border: 1px solid var(--ink-220);
+  background: var(--surface-1);
+  color: var(--ink-900);
+  border-radius: var(--radius-control);
+  min-height: 2.15rem;
+  padding: 0 0.72rem;
+  font-weight: 600;
+}
+
+.actions button:last-child {
+  border-color: var(--accent-300);
+  background: var(--accent-100);
+}
+
+.activeMode {
+  border-color: var(--accent-400) !important;
+  background: color-mix(in srgb, var(--accent-200) 65%, var(--surface-0)) !important;
+}
+
+.connected {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.connected p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-700);
+}
+
+.status {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--ink-700);
+}
+
+.error {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--danger-600);
+}
+
+.panel button:focus-visible,
+.panel input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-400) 72%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .actions {
+    width: 100%;
+  }
+
+  .actions button {
+    flex: 1 1 calc(50% - 0.45rem);
+  }
+}

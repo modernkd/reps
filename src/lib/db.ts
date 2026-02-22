@@ -28,6 +28,7 @@ import {
   type PlannedWorkout,
   type Workout,
   type WorkoutIntensity,
+  type WorkoutType,
   sessionPlanSchema,
   workoutSchema,
   workoutTypeSchema,
@@ -152,6 +153,190 @@ exerciseCatalogCollection.createIndex((row) => row.name, {
 
 async function persist(tx: Transaction<Record<string, unknown>>): Promise<void> {
   await tx.isPersisted.promise
+}
+
+const WORKOUT_DATA_SNAPSHOT_SCHEMA_VERSION = 1
+
+type PersistedCollection<T extends { id: string }> = {
+  toArray: T[]
+  preload: () => Promise<void>
+  delete: (keys: string[]) => Transaction<Record<string, unknown>>
+  insert: (value: T | T[]) => Transaction<Record<string, unknown>>
+}
+
+type SnapshotShape = {
+  schemaVersion: number
+  exportedAt: string
+  workoutTypes: WorkoutType[]
+  workouts: Workout[]
+  planTemplates: PlanTemplate[]
+  planDays: PlanDay[]
+  exerciseTemplates: ExerciseTemplate[]
+  exerciseCatalog: ExerciseCatalogEntry[]
+  scheduledSessions: ScheduledSession[]
+  activeSessionDrafts: ActiveSessionDraft[]
+  sessionPlans: SessionPlan[]
+}
+
+export type WorkoutDataSnapshot = SnapshotShape
+
+type SafeParser<T> = {
+  safeParse: (value: unknown) => { success: true; data: T } | { success: false }
+}
+
+function parseSnapshotArray<T>(value: unknown, parser: SafeParser<T>): T[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const parsed: T[] = []
+  for (const item of value) {
+    const result = parser.safeParse(item)
+    if (result.success) {
+      parsed.push(result.data)
+    }
+  }
+
+  return parsed
+}
+
+function sortById<T extends { id: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.id.localeCompare(b.id))
+}
+
+function sortBySessionId<T extends { sessionId: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
+}
+
+function normalizeWorkoutDataSnapshot(input: Partial<WorkoutDataSnapshot>): WorkoutDataSnapshot {
+  return {
+    schemaVersion:
+      typeof input.schemaVersion === 'number'
+        ? input.schemaVersion
+        : WORKOUT_DATA_SNAPSHOT_SCHEMA_VERSION,
+    exportedAt:
+      typeof input.exportedAt === 'string' && input.exportedAt.length > 0
+        ? input.exportedAt
+        : nowIso(),
+    workoutTypes: sortById(parseSnapshotArray(input.workoutTypes, workoutTypeSchema)),
+    workouts: sortById(parseSnapshotArray(input.workouts, workoutSchema)),
+    planTemplates: sortById(parseSnapshotArray(input.planTemplates, planTemplateSchema)),
+    planDays: sortById(parseSnapshotArray(input.planDays, planDaySchema)),
+    exerciseTemplates: sortById(
+      parseSnapshotArray(input.exerciseTemplates, exerciseTemplateSchema),
+    ),
+    exerciseCatalog: sortById(
+      parseSnapshotArray(input.exerciseCatalog, exerciseCatalogEntrySchema),
+    ),
+    scheduledSessions: sortById(
+      parseSnapshotArray(input.scheduledSessions, scheduledSessionSchema),
+    ),
+    activeSessionDrafts: sortBySessionId(
+      parseSnapshotArray(input.activeSessionDrafts, activeSessionDraftSchema),
+    ),
+    sessionPlans: sortById(parseSnapshotArray(input.sessionPlans, sessionPlanSchema)),
+  }
+}
+
+export function exportWorkoutDataSnapshot(): WorkoutDataSnapshot {
+  return normalizeWorkoutDataSnapshot({
+    schemaVersion: WORKOUT_DATA_SNAPSHOT_SCHEMA_VERSION,
+    exportedAt: nowIso(),
+    workoutTypes: workoutTypesCollection.toArray,
+    workouts: workoutsCollection.toArray,
+    planTemplates: planTemplatesCollection.toArray,
+    planDays: planDaysCollection.toArray,
+    exerciseTemplates: exerciseTemplatesCollection.toArray,
+    exerciseCatalog: exerciseCatalogCollection.toArray,
+    scheduledSessions: scheduledSessionsCollection.toArray,
+    activeSessionDrafts: activeSessionDraftsCollection.toArray,
+    sessionPlans: sessionPlansCollection.toArray,
+  })
+}
+
+export function serializeWorkoutDataSnapshot(snapshot: WorkoutDataSnapshot): string {
+  const normalized = normalizeWorkoutDataSnapshot(snapshot)
+  return JSON.stringify(normalized)
+}
+
+async function clearCollectionById<T extends { id: string }>(
+  collection: PersistedCollection<T>,
+): Promise<void> {
+  await collection.preload()
+  const ids = collection.toArray.map((entry) => entry.id)
+  if (ids.length === 0) {
+    return
+  }
+
+  await persist(collection.delete(ids))
+}
+
+async function clearSessionDraftCollection(): Promise<void> {
+  await activeSessionDraftsCollection.preload()
+  const keys = activeSessionDraftsCollection.toArray.map((entry) => entry.sessionId)
+  if (keys.length === 0) {
+    return
+  }
+
+  await persist(activeSessionDraftsCollection.delete(keys))
+}
+
+export async function replaceWorkoutDataSnapshot(
+  snapshot: Partial<WorkoutDataSnapshot>,
+): Promise<WorkoutDataSnapshot> {
+  const normalized = normalizeWorkoutDataSnapshot(snapshot)
+
+  await Promise.all([
+    workoutTypesCollection.preload(),
+    workoutsCollection.preload(),
+    planTemplatesCollection.preload(),
+    planDaysCollection.preload(),
+    exerciseTemplatesCollection.preload(),
+    exerciseCatalogCollection.preload(),
+    scheduledSessionsCollection.preload(),
+    activeSessionDraftsCollection.preload(),
+    sessionPlansCollection.preload(),
+  ])
+
+  await clearSessionDraftCollection()
+  await clearCollectionById(sessionPlansCollection)
+  await clearCollectionById(scheduledSessionsCollection)
+  await clearCollectionById(workoutsCollection)
+  await clearCollectionById(exerciseTemplatesCollection)
+  await clearCollectionById(planDaysCollection)
+  await clearCollectionById(planTemplatesCollection)
+  await clearCollectionById(exerciseCatalogCollection)
+  await clearCollectionById(workoutTypesCollection)
+
+  if (normalized.workoutTypes.length > 0) {
+    await persist(workoutTypesCollection.insert(normalized.workoutTypes))
+  }
+  if (normalized.workouts.length > 0) {
+    await persist(workoutsCollection.insert(normalized.workouts))
+  }
+  if (normalized.planTemplates.length > 0) {
+    await persist(planTemplatesCollection.insert(normalized.planTemplates))
+  }
+  if (normalized.planDays.length > 0) {
+    await persist(planDaysCollection.insert(normalized.planDays))
+  }
+  if (normalized.exerciseTemplates.length > 0) {
+    await persist(exerciseTemplatesCollection.insert(normalized.exerciseTemplates))
+  }
+  if (normalized.exerciseCatalog.length > 0) {
+    await persist(exerciseCatalogCollection.insert(normalized.exerciseCatalog))
+  }
+  if (normalized.scheduledSessions.length > 0) {
+    await persist(scheduledSessionsCollection.insert(normalized.scheduledSessions))
+  }
+  if (normalized.activeSessionDrafts.length > 0) {
+    await persist(activeSessionDraftsCollection.insert(normalized.activeSessionDrafts))
+  }
+  if (normalized.sessionPlans.length > 0) {
+    await persist(sessionPlansCollection.insert(normalized.sessionPlans))
+  }
+
+  return normalized
 }
 
 export async function ensureDefaultWorkoutTypes(): Promise<void> {

@@ -20,6 +20,13 @@
   letter-spacing: 0.01em;
 }
 
+.greeting {
+  margin: 0.32rem 0 0;
+  font-size: 0.92rem;
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
 .controls {
   --control-height: 2.35rem;
   --control-radius: var(--radius-control);

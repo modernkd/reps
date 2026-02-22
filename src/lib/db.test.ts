@@ -14,7 +14,9 @@ import {
   deletePlanTemplate,
   duplicateScheduledSession,
   exerciseTemplatesCollection,
+  exportWorkoutDataSnapshot,
   generateScheduleForRange,
+  getOrCreateSessionPlan,
   importStarterTemplate,
   LAST_TEMPLATE_DELETE_ERROR,
   MANUAL_PLAN_DAY_ID,
@@ -24,7 +26,9 @@ import {
   planDaysCollection,
   planManualWorkout,
   planTemplatesCollection,
+  replaceWorkoutDataSnapshot,
   scheduledSessionsCollection,
+  serializeWorkoutDataSnapshot,
   sessionPlansCollection,
   resetCompletedSession,
   updatePlanTemplate,
@@ -1124,5 +1128,44 @@ describe('clearDataBeforeDate', () => {
     expect(
       scheduledSessionsCollection.toArray.some((session) => session.date < '2026-02-10'),
     ).toBe(false)
+  })
+})
+
+describe('workout data snapshot sync', () => {
+  it('exports and restores all persisted collections', async () => {
+    await importStarterTemplate()
+    const manualSession = await planManualWorkout({
+      date: '2026-02-20',
+      type: 'lift',
+      durationMin: 40,
+      notes: 'sync test',
+    })
+
+    await getOrCreateSessionPlan(manualSession.id)
+
+    const snapshot = exportWorkoutDataSnapshot()
+    const snapshotJson = serializeWorkoutDataSnapshot(snapshot)
+
+    await clearSessionDraftCollection()
+    await clearCollection(sessionPlansCollection)
+    await clearCollection(scheduledSessionsCollection)
+    await clearCollection(workoutsCollection)
+    await clearCollection(exerciseTemplatesCollection)
+    await clearCollection(planDaysCollection)
+    await clearCollection(planTemplatesCollection)
+
+    await replaceWorkoutDataSnapshot(snapshot)
+    await Promise.all([
+      workoutsCollection.preload(),
+      planTemplatesCollection.preload(),
+      scheduledSessionsCollection.preload(),
+      sessionPlansCollection.preload(),
+    ])
+
+    expect(planTemplatesCollection.toArray.length).toBeGreaterThan(0)
+    expect(workoutsCollection.toArray.length).toBeGreaterThan(0)
+    expect(scheduledSessionsCollection.has(manualSession.id)).toBe(true)
+    expect(sessionPlansCollection.has(manualSession.id)).toBe(true)
+    expect(serializeWorkoutDataSnapshot(exportWorkoutDataSnapshot())).toBe(snapshotJson)
   })
 })

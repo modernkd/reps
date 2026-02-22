@@ -31,6 +31,7 @@ import {
   deleteWorkout,
   ensureDefaultWorkoutTypes,
   ensureDefaultExerciseCatalog,
+  exportWorkoutDataSnapshot,
   exerciseCatalogCollection,
   exerciseTemplatesCollection,
   generateScheduleForRange,
@@ -41,9 +42,11 @@ import {
   planDaysCollection,
   planTemplatesCollection,
   MANUAL_TEMPLATE_ID,
+  replaceWorkoutDataSnapshot,
   resetCompletedSession,
   saveGuidedSessionDraft,
   scheduledSessionsCollection,
+  serializeWorkoutDataSnapshot,
   sessionPlansCollection,
   skipScheduledSession,
   moveScheduledSessionToDate,
@@ -55,6 +58,13 @@ import {
   workoutTypesCollection,
   workoutsCollection,
 } from '@/lib/db'
+import {
+  getCurrentCloudUser,
+  isCloudSyncConfigured,
+  pullCloudSnapshot,
+  pushCloudSnapshot,
+  subscribeToCloudAuthState,
+} from '@/lib/cloudSync'
 import { addDaysIso, addMonthOffset, todayIso, toDateIso } from '@/lib/date'
 import { STARTER_TEMPLATE_ID } from '@/lib/templates'
 import { sendSkippedWorkoutNotification } from '@/lib/notifications'
@@ -134,6 +144,31 @@ function applyTheme(theme: ThemeMode) {
   if (themeMeta) {
     themeMeta.setAttribute('content', theme === 'dark' ? themeMetaDark : themeMetaLight)
   }
+}
+
+function getCloudUserName(user: { email: string | null; metadata: Record<string, unknown> | null } | null): string | null {
+  if (!user) {
+    return null
+  }
+
+  const metadata = user.metadata
+  const candidate =
+    (typeof metadata?.full_name === 'string' && metadata.full_name) ||
+    (typeof metadata?.name === 'string' && metadata.name) ||
+    (typeof metadata?.display_name === 'string' && metadata.display_name) ||
+    ''
+
+  if (candidate.trim()) {
+    return candidate.trim()
+  }
+
+  const email = user.email?.trim()
+  if (!email) {
+    return null
+  }
+
+  const localPart = email.split('@')[0]?.trim()
+  return localPart || null
 }
 
 export const Route = createFileRoute('/')({
@@ -248,6 +283,11 @@ function WorkoutDashboard() {
   const [theme, setTheme] = useState<ThemeMode>('dark')
   const [themeReady, setThemeReady] = useState(false)
   const [previewSessionId, setPreviewSessionId] = useState<string | null>(null)
+  const [cloudUser, setCloudUser] = useState<{
+    id: string
+    email: string | null
+    metadata: Record<string, unknown> | null
+  } | null>(null)
   const [copiedWorkout, setCopiedWorkout] = useState<{
     scheduledSessionId?: string
     type: string
@@ -258,6 +298,10 @@ function WorkoutDashboard() {
     notes?: string
   } | null>(null)
   const isSavingTemplateRef = useRef(false)
+  const greetingName = useMemo(() => getCloudUserName(cloudUser), [cloudUser])
+  const cloudSyncEnabled = isCloudSyncConfigured()
+  const cloudSyncReadyRef = useRef(false)
+  const lastCloudSnapshotRef = useRef<string | null>(null)
 
   const viewRef = useRef<HTMLDivElement | null>(null)
 
@@ -404,6 +448,31 @@ function WorkoutDashboard() {
   const previewPlan = previewSessionId
     ? sessionPlans.find((plan) => plan.sessionId === previewSessionId)
     : undefined
+  const hydrateCloudState = async (userId: string) => {
+    cloudSyncReadyRef.current = false
+
+    try {
+      const remote = await pullCloudSnapshot(userId)
+      if (remote.snapshot) {
+        const normalized = await replaceWorkoutDataSnapshot(remote.snapshot)
+        await Promise.all([
+          ensureDefaultWorkoutTypes(),
+          ensureDefaultExerciseCatalog(),
+          importStarterTemplate(),
+        ])
+
+        lastCloudSnapshotRef.current = serializeWorkoutDataSnapshot(normalized)
+      } else {
+        const localSnapshot = exportWorkoutDataSnapshot()
+        await pushCloudSnapshot(userId, localSnapshot)
+        lastCloudSnapshotRef.current = serializeWorkoutDataSnapshot(localSnapshot)
+      }
+    } catch {
+      // Keep local state intact when cloud sync fails.
+    } finally {
+      cloudSyncReadyRef.current = true
+    }
+  }
 
   useEffect(() => {
     ensureDefaultWorkoutTypes().catch(() => {
@@ -422,6 +491,64 @@ function WorkoutDashboard() {
       setErrorMessage(copy.route.importTemplateError)
     })
   }, [copy.route.importTemplateError])
+
+  useEffect(() => {
+    if (!cloudSyncEnabled) {
+      return
+    }
+
+    let isMounted = true
+    const toCloudUser = (
+      id: string,
+      email?: string | null,
+      metadata?: Record<string, unknown> | null,
+    ) => ({
+      id,
+      email: email ?? null,
+      metadata: metadata ?? null,
+    })
+
+    getCurrentCloudUser()
+      .then((user) => {
+        if (!isMounted) {
+          return
+        }
+
+        if (!user) {
+          setCloudUser(null)
+          return
+        }
+
+        setCloudUser(
+          toCloudUser(user.id, user.email, (user.user_metadata as Record<string, unknown>) ?? null),
+        )
+        void hydrateCloudState(user.id)
+      })
+      .catch(() => {})
+
+    const unsubscribe = subscribeToCloudAuthState((user) => {
+      if (!isMounted) {
+        return
+      }
+
+      if (!user) {
+        setCloudUser(null)
+        lastCloudSnapshotRef.current = null
+        cloudSyncReadyRef.current = false
+        return
+      }
+
+      setCloudUser(
+        toCloudUser(user.id, user.email, (user.user_metadata as Record<string, unknown>) ?? null),
+      )
+      void hydrateCloudState(user.id)
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe?.()
+    }
+  }, [cloudSyncEnabled])
 
   useEffect(() => {
     const bootTheme = document.documentElement.getAttribute('data-theme')
@@ -540,6 +667,41 @@ function WorkoutDashboard() {
 
     setSearch((prev) => ({ ...prev, session: undefined }))
   }, [activeTemplateId, search.session, sessions])
+
+  useEffect(() => {
+    if (!cloudSyncEnabled || !cloudUser || !cloudSyncReadyRef.current) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      void (async () => {
+        const snapshot = exportWorkoutDataSnapshot()
+        const serialized = serializeWorkoutDataSnapshot(snapshot)
+        if (serialized === lastCloudSnapshotRef.current) {
+          return
+        }
+
+        await pushCloudSnapshot(cloudUser.id, snapshot)
+        lastCloudSnapshotRef.current = serialized
+      })()
+    }, 1200)
+
+    return () => {
+      window.clearTimeout(timeout)
+    }
+  }, [
+    cloudSyncEnabled,
+    cloudUser,
+    workouts,
+    workoutTypes,
+    templates,
+    planDays,
+    exercises,
+    exerciseCatalog,
+    sessions,
+    drafts,
+    sessionPlans,
+  ])
 
   const handleChangeView = (nextView: DashboardView) => {
     setSearch((prev) => ({ ...prev, view: nextView }))
@@ -1207,6 +1369,8 @@ function WorkoutDashboard() {
           <AppHeader
             view={view}
             language={language}
+            greetingName={greetingName}
+            isSignedIn={Boolean(cloudUser)}
             templates={templates.map((template) => ({
               id: template.id,
               name: template.name,
@@ -1219,7 +1383,17 @@ function WorkoutDashboard() {
             onOpenEditTemplate={handleOpenEditTemplate}
             onOpenDuplicateTemplate={handleOpenDuplicateTemplate}
             onDeleteTemplate={handleDeleteTemplate}
-            onOpenCreateWorkout={() => handleOpenCreate(selectedDate)}
+            onOpenAuth={() =>
+              navigate({
+                to: '/auth',
+                search: {
+                  redirect:
+                    typeof window === 'undefined'
+                      ? '/'
+                      : `${window.location.pathname}${window.location.search}`,
+                },
+              })
+            }
           />
         ) : null}
 

@@ -1,0 +1,153 @@
+.page {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.card {
+  width: min(32rem, 100%);
+  display: grid;
+  gap: 0.95rem;
+  border: 1px solid var(--ink-250);
+  border-radius: 0.7rem;
+  background: var(--surface-0);
+  box-shadow: var(--shadow-2);
+  padding: 1rem;
+}
+
+.header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.92rem;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-700);
+  font-size: 0.9rem;
+}
+
+.status {
+  margin: 0;
+  color: color-mix(in srgb, var(--ok-600, #117443) 88%, var(--ink-900));
+  font-size: 0.88rem;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger-700);
+  font-size: 0.88rem;
+}
+
+.modeActions {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.modeActions button,
+.form button,
+.googleButton,
+.secondaryLink {
+  min-height: 2.35rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--ink-250);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  font-size: 0.88rem;
+  padding: 0.45rem 0.78rem;
+}
+
+.modeActions button {
+  cursor: pointer;
+}
+
+.modeActions .active {
+  border-color: var(--ink-900);
+  background: var(--ink-900);
+  color: var(--surface-0);
+}
+
+.form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.form label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--ink-700);
+}
+
+.form input {
+  min-height: 2.35rem;
+  border: 1px solid var(--ink-250);
+  border-radius: var(--radius-control);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  font-size: 0.92rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.form button,
+.googleButton {
+  cursor: pointer;
+  border-color: transparent;
+  background: var(--accent-600);
+  color: #fff;
+  font-weight: 600;
+}
+
+.actionsRow {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.modeActions button:focus-visible,
+.form input:focus-visible,
+.form button:focus-visible,
+.googleButton:focus-visible,
+.secondaryLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding: 0.75rem;
+  }
+
+  .card {
+    border-radius: 0.66rem;
+    padding: 0.85rem;
+  }
+
+  .modeActions button,
+  .form button,
+  .googleButton,
+  .secondaryLink,
+  .form input {
+    min-height: 2.55rem;
+    font-size: 0.93rem;
+  }
+}
