@@ -1,36 +1,34 @@
+import { isCustomExerciseVariant } from './variants'
+import { defaultExercisesData } from './defaultExercisesData'
+
 const CUSTOM_IMAGE_STORAGE_KEY = 'workout-tracker.custom-exercise-images.v1'
-
-const EXERCISE_IMAGE_QUERY_BY_ID: Record<string, string> = {
-  ex_pullups: 'pull up exercise',
-  ex_bench_press: 'bench press exercise',
-  ex_overhead_press: 'overhead press exercise',
-  ex_incline_db_press: 'incline dumbbell press exercise',
-  ex_back_squat: 'back squat exercise',
-  ex_rdl: 'romanian deadlift exercise',
-  ex_lunges: 'walking lunge exercise',
-  ex_leg_curl: 'leg curl exercise',
-  ex_calf_raise: 'standing calf raise exercise',
-  ex_barbell_row: 'barbell row exercise',
-  ex_incline_bench: 'incline bench press exercise',
-  ex_lateral_raise: 'lateral raise exercise',
-  ex_cable_row: 'seated cable row exercise',
-  ex_hammer_curl: 'hammer curl exercise',
-  ex_skull_crusher: 'skull crusher exercise',
-  ex_deadlift: 'deadlift exercise',
-  ex_front_squat: 'front squat exercise',
-  ex_hip_thrust: 'hip thrust exercise',
-  ex_leg_extension: 'leg extension machine exercise',
-  ex_seated_calf_raise: 'seated calf raise exercise',
-}
-
-const commonsCache = new Map<string, string | null>()
 
 export type ExerciseReferenceImage = {
   url: string
-  source: 'uploaded' | 'commons'
+  source: 'uploaded' | 'commons' | 'db'
+}
+
+export type FreeExerciseDbEntry = {
+  id: string
+  name: string
+  category?: string
+  equipment?: string
+  force?: string
+  level?: string
+  mechanic?: string
+  primaryMuscles?: string[]
+  secondaryMuscles?: string[]
+  images?: string[]
+  instructions?: string[]
 }
 
 type StoredCustomExerciseImages = Record<string, string>
+
+export type ExerciseReferenceContent = {
+  images: string[]
+  instructions: string[]
+  source: 'uploaded' | 'commons' | 'db'
+}
 
 export function normalizeExerciseName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -107,89 +105,207 @@ export function readFileAsDataUrl(file: File): Promise<string> {
   })
 }
 
-function buildCommonsQuery(searchTerm: string): URL {
-  const url = new URL('https://commons.wikimedia.org/w/api.php')
-  url.searchParams.set('action', 'query')
-  url.searchParams.set('format', 'json')
-  url.searchParams.set('origin', '*')
-  url.searchParams.set('generator', 'search')
-  url.searchParams.set('gsrnamespace', '6')
-  url.searchParams.set('gsrsearch', `${searchTerm} workout form`)
-  url.searchParams.set('gsrlimit', '1')
-  url.searchParams.set('prop', 'imageinfo')
-  url.searchParams.set('iiprop', 'url')
-  url.searchParams.set('iiurlwidth', '800')
-  return url
-}
+// In-memory cache for the free-exercise-db JSON
+let freeExerciseDbCache: null | FreeExerciseDbEntry[] = null
+const exerciseReferenceContentCache = new Map<string, ExerciseReferenceContent>()
 
-async function fetchCommonsImage(searchTerm: string): Promise<string | undefined> {
-  if (typeof fetch !== 'function') {
-    return undefined
-  }
+async function getOrFetchFreeExerciseDb() {
+  if (freeExerciseDbCache) return freeExerciseDbCache
 
-  const normalizedSearch = normalizeExerciseName(searchTerm)
-  if (!normalizedSearch) {
-    return undefined
-  }
+  const allowTestDbAccess =
+    typeof globalThis !== 'undefined' &&
+    (globalThis as { __ALLOW_EXERCISE_DB_IN_TEST__?: boolean })
+      .__ALLOW_EXERCISE_DB_IN_TEST__ === true
 
-  if (commonsCache.has(normalizedSearch)) {
-    return commonsCache.get(normalizedSearch) ?? undefined
+  if (
+    (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') ||
+    (typeof import.meta !== 'undefined' && (import.meta as { env?: { MODE?: string } }).env?.MODE === 'test')
+  ) {
+    if (!allowTestDbAccess) {
+      return null
+    }
   }
 
   try {
-    const response = await fetch(buildCommonsQuery(normalizedSearch).toString())
-    if (!response.ok) {
-      commonsCache.set(normalizedSearch, null)
-      return undefined
+    const response = await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json')
+    if (!response.ok) return null
+    const payload = await response.json()
+    if (!Array.isArray(payload)) {
+      return null
     }
 
-    const payload = (await response.json()) as {
-      query?: {
-        pages?: Record<
-          string,
-          {
-            imageinfo?: Array<{
-              thumburl?: string
-              url?: string
-            }>
-          }
-        >
-      }
-    }
-
-    const pages = payload.query?.pages ? Object.values(payload.query.pages) : []
-    const imageInfo = pages[0]?.imageinfo?.[0]
-    const imageUrl = imageInfo?.thumburl ?? imageInfo?.url
-
-    commonsCache.set(normalizedSearch, imageUrl ?? null)
-    return imageUrl
+    freeExerciseDbCache = payload as FreeExerciseDbEntry[]
+    return freeExerciseDbCache
   } catch {
-    commonsCache.set(normalizedSearch, null)
+    return null
+  }
+}
+
+export async function getFreeExerciseDbExerciseNames(): Promise<string[]> {
+  // Delegate to central exerciseDb module
+  const { getAllExerciseNames } = await import('./exerciseDb')
+  return getAllExerciseNames()
+}
+
+function buildFreeExerciseImageUrl(path: string): string {
+  return `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${path}`
+}
+
+function matchFreeExerciseEntry(
+  db: FreeExerciseDbEntry[],
+  exerciseName: string,
+): FreeExerciseDbEntry | undefined {
+  const normalizedSearchName = normalizeExerciseName(exerciseName)
+  if (!normalizedSearchName) {
     return undefined
   }
+
+  return db.find((entry) => {
+    const normalizedEntryName = normalizeExerciseName(entry.name)
+    return (
+      normalizedEntryName === normalizedSearchName ||
+      normalizedEntryName.includes(normalizedSearchName) ||
+      normalizedSearchName.includes(normalizedEntryName)
+    )
+  })
+}
+
+export async function resolveFreeExerciseDbEntry(exerciseName: string): Promise<FreeExerciseDbEntry | undefined> {
+  // Delegate to central exerciseDb module
+  const { getExerciseByName } = await import('./exerciseDb')
+  return getExerciseByName(exerciseName)
+}
+
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const blob = await response.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+
+
+export async function resolveExerciseReferenceContent(
+  exerciseId: string,
+  exerciseName: string,
+): Promise<ExerciseReferenceContent | undefined> {
+  const normalizedName = normalizeExerciseName(exerciseName)
+  if (!normalizedName) {
+    return undefined
+  }
+
+  const uploaded = getUploadedExerciseImage(exerciseName)
+  if (uploaded) {
+    return {
+      source: 'uploaded',
+      images: [uploaded],
+      instructions: [],
+    }
+  }
+
+  const cachedContent = exerciseReferenceContentCache.get(normalizedName)
+  if (cachedContent) {
+    return cachedContent
+  }
+
+  if (exerciseId && defaultExercisesData[exerciseId]) {
+    const data = defaultExercisesData[exerciseId]
+    const images = data.images || []
+    const instructions = (data.instructions || []).map((i: string) => i.trim()).filter((i: string) => i.length > 0)
+
+    if (images.length > 0) {
+      const result: ExerciseReferenceContent = {
+        source: 'db',
+        images,
+        instructions,
+      }
+
+      exerciseReferenceContentCache.set(normalizedName, result)
+      return result
+    }
+  }
+
+  // Use central exerciseDb module instead of direct DB access
+  const { getExerciseByName } = await import('./exerciseDb')
+  const matchedDbExercise = await getExerciseByName(exerciseName)
+  if (matchedDbExercise) {
+    const images =
+      matchedDbExercise.images
+        ?.map((path) => path.trim())
+        .filter((path) => path.length > 0)
+        .map(buildFreeExerciseImageUrl) ?? []
+    const instructions =
+      matchedDbExercise.instructions
+        ?.map((instruction) => instruction.trim())
+        .filter((instruction) => instruction.length > 0) ?? []
+
+    if (images.length > 0) {
+      const result: ExerciseReferenceContent = {
+        source: 'db',
+        images,
+        instructions,
+      }
+
+      exerciseReferenceContentCache.set(normalizedName, result)
+      return result
+    }
+  }
+
+  // Keep custom variants resilient when remote image URLs cannot be used.
+  if (isCustomExerciseVariant(exerciseId, exerciseName) && matchedDbExercise?.images?.length) {
+    const firstImagePath = matchedDbExercise.images[0]
+    if (firstImagePath) {
+      const base64 = await fetchImageAsBase64(buildFreeExerciseImageUrl(firstImagePath))
+      if (base64) {
+        const instructions =
+          matchedDbExercise.instructions
+            ?.map((instruction) => instruction.trim())
+            .filter((instruction) => instruction.length > 0) ?? []
+        saveUploadedExerciseImage(exerciseName, base64)
+
+        const result: ExerciseReferenceContent = {
+          source: 'uploaded',
+          images: [base64],
+          instructions,
+        }
+
+        exerciseReferenceContentCache.set(normalizedName, result)
+        return result
+      }
+    }
+  }
+
+  const fallback: ExerciseReferenceContent = {
+    source: 'db', // default fallback assumes these are our static images
+    images: [`/images/exercises/${exerciseId}_0.webp`],
+    instructions: [],
+  }
+  exerciseReferenceContentCache.set(normalizedName, fallback)
+
+  return fallback
 }
 
 export async function resolveExerciseReferenceImage(
   exerciseId: string,
   exerciseName: string,
 ): Promise<ExerciseReferenceImage | undefined> {
-  const uploaded = getUploadedExerciseImage(exerciseName)
-  if (uploaded) {
-    return { url: uploaded, source: 'uploaded' }
+  const content = await resolveExerciseReferenceContent(exerciseId, exerciseName)
+  const firstImage = content?.images[0]
+  if (!firstImage) {
+    return undefined
   }
 
-  const queries = [
-    EXERCISE_IMAGE_QUERY_BY_ID[exerciseId],
-    exerciseName,
-    `${exerciseName} gym`,
-  ].filter((item): item is string => Boolean(item))
-
-  for (const query of queries) {
-    const commonsImage = await fetchCommonsImage(query)
-    if (commonsImage) {
-      return { url: commonsImage, source: 'commons' }
-    }
+  return {
+    source: content.source,
+    url: firstImage,
   }
-
-  return undefined
 }
