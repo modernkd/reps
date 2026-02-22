@@ -149,6 +149,8 @@ export function GuidedWorkoutView({
 
   const totalSetsTarget = exercises.reduce((acc, exercise) => acc + exercise.sets, 0)
   const completedSets = setLogs.length
+  const isWorkoutSetsComplete =
+    totalSetsTarget > 0 && completedSets >= totalSetsTarget
 
   useEffect(() => {
     if (!draft.restEndAt) {
@@ -209,8 +211,28 @@ export function GuidedWorkoutView({
       return copy.guided.startFirstSet
     }
 
+    if (isWorkoutSetsComplete) {
+      return copy.guided.startCoolDown
+    }
+
     return copy.guided.setsLogged(completedSets, totalSetsTarget)
-  }, [completedSets, copy.guided, totalSetsTarget])
+  }, [completedSets, copy.guided, isWorkoutSetsComplete, totalSetsTarget])
+
+  const visibleExercise = isWorkoutSetsComplete ? undefined : currentExercise
+  const setCounterText = visibleExercise
+    ? `${copy.guided.set} ${currentSetIndex + 1} ${copy.guided.of} ${visibleExercise.sets}`
+    : ''
+  const exerciseTargetTextParts: string[] = []
+
+  if (visibleExercise?.minReps || visibleExercise?.maxReps) {
+    exerciseTargetTextParts.push(
+      `${copy.guided.target} ${visibleExercise.minReps ?? visibleExercise.maxReps}-${visibleExercise.maxReps ?? visibleExercise.minReps} ${copy.guided.reps}`,
+    )
+  }
+
+  if (visibleExercise?.targetMassKg) {
+    exerciseTargetTextParts.push(`${copy.guided.target} ${visibleExercise.targetMassKg} kg`)
+  }
 
   const persist = async (next: {
     exerciseIndex: number
@@ -283,7 +305,7 @@ export function GuidedWorkoutView({
   }
 
   const handleCompleteSet = async () => {
-    if (!currentExercise) {
+    if (!currentExercise || isWorkoutSetsComplete) {
       return
     }
 
@@ -396,23 +418,14 @@ export function GuidedWorkoutView({
       </header>
 
       <article className={styles.card}>
-        <h3>{currentExercise?.name ?? copy.guided.allExercisesComplete}</h3>
-        <p>
-          {copy.guided.set} {currentSetIndex + 1}
-          {currentExercise ? ` ${copy.guided.of} ${currentExercise.sets}` : ''}
-          {currentExercise?.minReps || currentExercise?.maxReps
-            ? ` · ${copy.guided.target} ${currentExercise.minReps ?? currentExercise.maxReps}-${currentExercise.maxReps ?? currentExercise.minReps} ${copy.guided.reps}`
-            : ''}
-          {currentExercise?.targetMassKg
-            ? ` · ${copy.guided.target} ${currentExercise.targetMassKg} kg`
-            : ''}
-        </p>
+        <h3>{visibleExercise?.name ?? copy.guided.allExercisesComplete}</h3>
+        {exerciseTargetTextParts.length > 0 ? <p>{exerciseTargetTextParts.join(' · ')}</p> : null}
 
-        {currentExercise ? (
+        {visibleExercise ? (
           <label className={styles.variantControl}>
             {copy.guided.variant}
             <input
-              list={variantSuggestionListId(currentExercise.id)}
+              list={variantSuggestionListId(visibleExercise.id)}
               value={variantInput}
               placeholder={copy.guided.exerciseVariantPlaceholder}
               onChange={(event) => setVariantInput(event.target.value)}
@@ -426,7 +439,7 @@ export function GuidedWorkoutView({
                 }
               }}
             />
-            <datalist id={variantSuggestionListId(currentExercise.id)}>
+            <datalist id={variantSuggestionListId(visibleExercise.id)}>
               {currentVariantOptions.map((variant) => (
                 <option key={variant} value={variant} />
               ))}
@@ -434,7 +447,7 @@ export function GuidedWorkoutView({
           </label>
         ) : null}
 
-        {currentExercise ? (
+        {visibleExercise ? (
           <section className={styles.referenceCard}>
             <div className={styles.referenceMediaFrame}>
               {activeReferenceImage ? (
@@ -513,41 +526,50 @@ export function GuidedWorkoutView({
           </section>
         ) : null}
 
-        <div className={styles.repControls}>
-          <button type="button" onClick={() => setReps((value) => Math.max(0, value - 1))}>
-            -
+        {visibleExercise ? (
+          <>
+            <div className={styles.repControls}>
+              <button type="button" onClick={() => setReps((value) => Math.max(0, value - 1))}>
+                -
+              </button>
+              <input
+                type="number"
+                min={0}
+                value={reps}
+                onChange={(event) => setReps(Number(event.target.value) || 0)}
+              />
+              <button type="button" onClick={() => setReps((value) => value + 1)}>
+                +
+              </button>
+              <span>{copy.guided.reps}</span>
+            </div>
+
+            <label className={styles.weightControl}>
+              {copy.guided.weightForSet}
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                value={weightKg}
+                onChange={(event) => setWeightKg(Number(event.target.value) || 0)}
+              />
+            </label>
+          </>
+        ) : null}
+
+        <div className={styles.setActionRow}>
+          {setCounterText ? <p className={styles.setCounter}>{setCounterText}</p> : null}
+          <button
+            type="button"
+            className={styles.completeSet}
+            onClick={isWorkoutSetsComplete ? handleFinish : handleCompleteSet}
+            disabled={!isWorkoutSetsComplete && !currentExercise}
+          >
+            {isWorkoutSetsComplete
+              ? copy.guided.finishWorkoutAndCoolDown
+              : copy.guided.completeSet}
           </button>
-          <input
-            type="number"
-            min={0}
-            value={reps}
-            onChange={(event) => setReps(Number(event.target.value) || 0)}
-          />
-          <button type="button" onClick={() => setReps((value) => value + 1)}>
-            +
-          </button>
-          <span>{copy.guided.reps}</span>
         </div>
-
-        <label className={styles.weightControl}>
-          {copy.guided.weightForSet}
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={weightKg}
-            onChange={(event) => setWeightKg(Number(event.target.value) || 0)}
-          />
-        </label>
-
-        <button
-          type="button"
-          className={styles.completeSet}
-          onClick={handleCompleteSet}
-          disabled={!currentExercise}
-        >
-          {copy.guided.completeSet}
-        </button>
       </article>
 
       <article className={styles.timerCard}>

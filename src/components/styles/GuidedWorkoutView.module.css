@@ -220,6 +220,20 @@
   width: 8rem;
 }
 
+.setActionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.setCounter {
+  margin: 0;
+  color: var(--ink-800);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
 .completeSet {
   border-color: var(--accent-600);
   color: var(--accent-700);
@@ -356,6 +370,11 @@
   .summaryBack {
     width: 100%;
     min-height: 2.2rem;
+  }
+
+  .setActionRow {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .repControls button {

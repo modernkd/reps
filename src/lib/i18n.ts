@@ -218,6 +218,7 @@ const COPY = {
       uploadCustomImage: 'Upload custom image',
       weightForSet: 'Weight for this set (kg)',
       completeSet: 'Complete set and continue',
+      finishWorkoutAndCoolDown: 'Finish workout and cool down',
       restTimer: 'Rest timer',
       resume: 'Resume',
       pause: 'Pause',
@@ -233,6 +234,7 @@ const COPY = {
       summaryBack: 'Back to workout',
       summaryConfirm: 'Save and complete',
       startFirstSet: 'Start your first set.',
+      startCoolDown: 'Start your cool down.',
       setsLogged: (count: number, total: number) => `${count}/${total} sets logged`,
     },
     sessionPlan: {
@@ -611,6 +613,7 @@ const COPY = {
       uploadCustomImage: 'Ladda upp egen bild',
       weightForSet: 'Vikt for detta set (kg)',
       completeSet: 'Slutfor set och fortsatt',
+      finishWorkoutAndCoolDown: 'Avsluta pass och varva ned',
       restTimer: 'Vilotimer',
       resume: 'Fortsatt',
       pause: 'Pausa',
@@ -626,6 +629,7 @@ const COPY = {
       summaryBack: 'Tillbaka till passet',
       summaryConfirm: 'Spara och avsluta',
       startFirstSet: 'Borja med forsta setet.',
+      startCoolDown: 'Borja med nedvarvning.',
       setsLogged: (count: number, total: number) => `${count}/${total} set loggade`,
     },
     sessionPlan: {
