@@ -5,7 +5,9 @@ import {
   getAllEquipmentTypes,
   getAllLevels,
   getAllMuscleGroups,
+  getAllCategories,
   getExerciseByName,
+  getExerciseSwapRecommendations,
   getExercisesByCategory,
   getExercisesByEquipment,
   getExercisesByLevel,
@@ -242,6 +244,63 @@ describe('exerciseDb', () => {
       const levels = await getAllLevels()
       const sortedLevels = [...levels].sort((a, b) => a.localeCompare(b))
       expect(levels).toEqual(sortedLevels)
+    })
+  })
+
+  describe('getAllCategories', () => {
+    it('returns all categories', async () => {
+      const categories = await getAllCategories()
+      expect(categories.length).toBeGreaterThan(0)
+      expect(categories).toContain('strength')
+    })
+
+    it('returns sorted categories', async () => {
+      const categories = await getAllCategories()
+      const sortedCategories = [...categories].sort((a, b) => a.localeCompare(b))
+      expect(categories).toEqual(sortedCategories)
+    })
+  })
+
+  describe('getExerciseSwapRecommendations', () => {
+    it('returns ranked similar alternatives by muscle/equipment/category', async () => {
+      const result = await getExerciseSwapRecommendations('Bench Press')
+
+      expect(result.sourceExercise).toBeDefined()
+      expect(result.similar.length).toBeGreaterThan(0)
+      expect(result.similar.every((option) => option.exercise.id !== result.sourceExercise?.id)).toBe(
+        true,
+      )
+      expect(
+        result.similar.some(
+          (option) =>
+            option.muscleFocus.length > 0 || option.sameEquipment || option.sameCategory,
+        ),
+      ).toBe(true)
+    })
+
+    it('returns beginner-safe alternatives with beginner level only', async () => {
+      const result = await getExerciseSwapRecommendations('Front Squat')
+
+      expect(result.beginnerSafe.length).toBeGreaterThan(0)
+      expect(
+        result.beginnerSafe.every((option) => option.exercise.level === 'beginner'),
+      ).toBe(true)
+    })
+
+    it('extracts concise technique snippets from matched exercise instructions', async () => {
+      const result = await getExerciseSwapRecommendations('Barbell Bench Press - Medium Grip')
+
+      expect(result.techniqueSnippets.length).toBeGreaterThan(0)
+      expect(result.techniqueSnippets[0]!.length).toBeLessThanOrEqual(160)
+    })
+
+    it('handles unknown names without throwing', async () => {
+      const result = await getExerciseSwapRecommendations('totally unknown exercise name')
+
+      expect(result.sourceExercise).toBeUndefined()
+      expect(Array.isArray(result.similar)).toBe(true)
+      expect(Array.isArray(result.beginnerSafe)).toBe(true)
+      expect(result.techniqueSnippets).toEqual([])
     })
   })
 

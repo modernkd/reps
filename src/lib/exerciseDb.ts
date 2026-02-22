@@ -14,6 +14,21 @@ export type ExerciseDbEntry = {
   instructions?: string[]
 }
 
+export type ExerciseSwapOption = {
+  exercise: ExerciseDbEntry
+  score: number
+  muscleFocus: string[]
+  sameEquipment: boolean
+  sameCategory: boolean
+}
+
+export type ExerciseSwapRecommendations = {
+  sourceExercise?: ExerciseDbEntry
+  similar: ExerciseSwapOption[]
+  beginnerSafe: ExerciseSwapOption[]
+  techniqueSnippets: string[]
+}
+
 type ExerciseDbIndexes = {
   byId: Map<string, ExerciseDbEntry>
   byName: Map<string, ExerciseDbEntry>
@@ -31,6 +46,150 @@ let indexesCache: null | ExerciseDbIndexes = null
 
 function normalizeString(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function normalizeOptional(value: string | undefined): string | null {
+  if (!value) {
+    return null
+  }
+
+  const normalized = normalizeString(value)
+  return normalized.length > 0 ? normalized : null
+}
+
+function getSharedMuscles(source: ExerciseDbEntry, candidate: ExerciseDbEntry): string[] {
+  const sourcePrimary = new Map<string, string>()
+  for (const muscle of source.primaryMuscles ?? []) {
+    sourcePrimary.set(normalizeString(muscle), muscle)
+  }
+
+  const shared = new Map<string, string>()
+
+  for (const muscle of candidate.primaryMuscles ?? []) {
+    const key = normalizeString(muscle)
+    if (sourcePrimary.has(key)) {
+      shared.set(key, sourcePrimary.get(key) ?? muscle)
+    }
+  }
+
+  // Keep secondaries as weaker muscle matches for "similar focus"
+  for (const muscle of candidate.secondaryMuscles ?? []) {
+    const key = normalizeString(muscle)
+    if (sourcePrimary.has(key) && !shared.has(key)) {
+      shared.set(key, sourcePrimary.get(key) ?? muscle)
+    }
+  }
+
+  return [...shared.values()]
+}
+
+function scoreSwapOption(source: ExerciseDbEntry, candidate: ExerciseDbEntry): ExerciseSwapOption | null {
+  const sourceName = normalizeString(source.name)
+  const candidateName = normalizeString(candidate.name)
+  if (sourceName === candidateName) {
+    return null
+  }
+
+  const muscleFocus = getSharedMuscles(source, candidate)
+  const sourceEquipment = normalizeOptional(source.equipment)
+  const candidateEquipment = normalizeOptional(candidate.equipment)
+  const sourceCategory = normalizeOptional(source.category)
+  const candidateCategory = normalizeOptional(candidate.category)
+  const sourceForce = normalizeOptional(source.force)
+  const candidateForce = normalizeOptional(candidate.force)
+  const sourceMechanic = normalizeOptional(source.mechanic)
+  const candidateMechanic = normalizeOptional(candidate.mechanic)
+  const sourceLevel = normalizeOptional(source.level)
+  const candidateLevel = normalizeOptional(candidate.level)
+
+  const sameEquipment = sourceEquipment !== null && sourceEquipment === candidateEquipment
+  const sameCategory = sourceCategory !== null && sourceCategory === candidateCategory
+
+  if (!muscleFocus.length && !sameEquipment && !sameCategory) {
+    return null
+  }
+
+  let score = muscleFocus.length * 5
+  if (sameEquipment) {
+    score += 3
+  }
+  if (sameCategory) {
+    score += 2
+  }
+  if (sourceForce !== null && sourceForce === candidateForce) {
+    score += 1
+  }
+  if (sourceMechanic !== null && sourceMechanic === candidateMechanic) {
+    score += 1
+  }
+  if (sourceLevel !== null && sourceLevel === candidateLevel) {
+    score += 1
+  }
+
+  return {
+    exercise: candidate,
+    score,
+    muscleFocus,
+    sameEquipment,
+    sameCategory,
+  }
+}
+
+function buildTechniqueSnippets(entry: ExerciseDbEntry | undefined): string[] {
+  if (!entry?.instructions || entry.instructions.length === 0) {
+    return []
+  }
+
+  const snippets: string[] = []
+  const seen = new Set<string>()
+
+  for (const rawInstruction of entry.instructions) {
+    const collapsed = rawInstruction.replace(/\s+/g, ' ').trim()
+    if (!collapsed) {
+      continue
+    }
+
+    const firstSentence =
+      collapsed.split(/(?<=[.!?])\s+/).find((segment) => segment.trim().length > 0) ??
+      collapsed
+
+    const normalized = normalizeString(firstSentence)
+    if (seen.has(normalized)) {
+      continue
+    }
+
+    seen.add(normalized)
+    snippets.push(
+      firstSentence.length > 160 ? `${firstSentence.slice(0, 157).trimEnd()}...` : firstSentence,
+    )
+
+    if (snippets.length >= 3) {
+      break
+    }
+  }
+
+  return snippets
+}
+
+function rankSwapOptions(
+  source: ExerciseDbEntry,
+  candidates: Iterable<ExerciseDbEntry>,
+): ExerciseSwapOption[] {
+  const options: ExerciseSwapOption[] = []
+  for (const candidate of candidates) {
+    const scored = scoreSwapOption(source, candidate)
+    if (scored) {
+      options.push(scored)
+    }
+  }
+
+  return options.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score
+    }
+
+    return left.exercise.name.localeCompare(right.exercise.name)
+  })
 }
 
 /**
@@ -383,4 +542,112 @@ export async function getAllEquipmentTypes(): Promise<string[]> {
 export async function getAllLevels(): Promise<string[]> {
   const indexes = await getIndexes()
   return Array.from(indexes.byLevel.keys()).sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Get all unique categories
+ */
+export async function getAllCategories(): Promise<string[]> {
+  const indexes = await getIndexes()
+  return Array.from(indexes.byCategory.keys()).sort((a, b) => a.localeCompare(b))
+}
+
+/**
+ * Get smart swap suggestions and instruction snippets for session/template planning.
+ */
+export async function getExerciseSwapRecommendations(
+  exerciseName: string,
+  options: { limit?: number; beginnerLimit?: number } = {},
+): Promise<ExerciseSwapRecommendations> {
+  if (!exerciseName.trim()) {
+    return {
+      similar: [],
+      beginnerSafe: [],
+      techniqueSnippets: [],
+    }
+  }
+
+  const limit = Math.max(1, options.limit ?? 4)
+  const beginnerLimit = Math.max(1, options.beginnerLimit ?? 4)
+  const sourceExercise = await getExerciseByName(exerciseName)
+
+  if (!sourceExercise) {
+    const fallbackMatches = await searchExercises(exerciseName)
+    const fallbackOptions = fallbackMatches.slice(0, limit).map((exercise) => ({
+      exercise,
+      score: 0,
+      muscleFocus: [],
+      sameEquipment: false,
+      sameCategory: false,
+    }))
+
+    return {
+      sourceExercise: undefined,
+      similar: fallbackOptions,
+      beginnerSafe: fallbackOptions
+        .filter((option) => normalizeOptional(option.exercise.level) === 'beginner')
+        .slice(0, beginnerLimit),
+      techniqueSnippets: [],
+    }
+  }
+
+  const indexes = await getIndexes()
+  const candidatePool = new Map<string, ExerciseDbEntry>()
+
+  for (const muscle of sourceExercise.primaryMuscles ?? []) {
+    const key = normalizeString(muscle)
+    const exercises = indexes.byPrimaryMuscle.get(key) ?? []
+    for (const exercise of exercises) {
+      candidatePool.set(exercise.id, exercise)
+    }
+  }
+
+  const sourceEquipment = normalizeOptional(sourceExercise.equipment)
+  if (sourceEquipment) {
+    const exercises = indexes.byEquipment.get(sourceEquipment) ?? []
+    for (const exercise of exercises) {
+      candidatePool.set(exercise.id, exercise)
+    }
+  }
+
+  const sourceCategory = normalizeOptional(sourceExercise.category)
+  if (sourceCategory) {
+    const exercises = indexes.byCategory.get(sourceCategory) ?? []
+    for (const exercise of exercises) {
+      candidatePool.set(exercise.id, exercise)
+    }
+  }
+
+  if (candidatePool.size < limit * 2) {
+    for (const exercise of indexes.byName.values()) {
+      candidatePool.set(exercise.id, exercise)
+    }
+  }
+
+  const ranked = rankSwapOptions(sourceExercise, candidatePool.values())
+  const similar = ranked.slice(0, limit)
+
+  const beginnerPool = indexes.byLevel.get('beginner') ?? []
+  const rankedBeginner = rankSwapOptions(sourceExercise, beginnerPool)
+  const beginnerById = new Set<string>()
+  const beginnerSafe: ExerciseSwapOption[] = []
+
+  for (const option of rankedBeginner) {
+    if (beginnerById.has(option.exercise.id)) {
+      continue
+    }
+
+    beginnerById.add(option.exercise.id)
+    beginnerSafe.push(option)
+    if (beginnerSafe.length >= beginnerLimit) {
+      break
+    }
+  }
+
+  return {
+    sourceExercise,
+    similar,
+    beginnerSafe,
+    techniqueSnippets: buildTechniqueSnippets(sourceExercise),
+  }
 }
