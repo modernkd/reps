@@ -78,7 +78,7 @@ function PrivacyRoute() {
           <h2>Contact</h2>
           <p>
             For privacy questions, contact:{" "}
-            <a href="mailto:privacy@example.com">privacy@example.com</a>
+            <a href="mailto:privacy@kd.works">privacy@kd.works</a>
           </p>
         </div>
       </article>
