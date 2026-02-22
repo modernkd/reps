@@ -92,7 +92,9 @@ export function AppHeader({
         </div>
 
         <div className={styles.templatePicker}>
-          <label htmlFor="template-select">{copy.appHeader.templateLabel}</label>
+          <label htmlFor="template-select">
+            {copy.appHeader.templateLabel}
+          </label>
           <div className={styles.templatePickerRow}>
             <select
               id="template-select"
@@ -208,14 +210,6 @@ export function AppHeader({
           onClick={onApplyTemplateToCalendar}
         >
           {copy.appHeader.addTemplateToCalendar}
-        </button>
-
-        <button
-          type="button"
-          className={styles.primary}
-          onClick={onOpenCreateWorkout}
-        >
-          {copy.appHeader.addWorkout}
         </button>
       </div>
     </header>

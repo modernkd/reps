@@ -28,7 +28,6 @@
   outline: 2px solid var(--accent-500);
   outline-offset: 2px;
 }
-
 .listbox {
   position: absolute;
   top: calc(100% + 0.32rem);
@@ -38,7 +37,7 @@
   overflow: auto;
   margin: 0;
   padding: 0.3rem;
-  border-radius: 0.9rem;
+  border-radius: 0.7rem;
   border: 1px solid var(--ink-250);
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
@@ -53,7 +52,7 @@
 .option button {
   width: 100%;
   border: 0;
-  border-radius: 0.68rem;
+  border-radius: 0.52rem;
   background: transparent;
   color: var(--ink-900);
   cursor: pointer;
@@ -67,7 +66,7 @@
   outline: 2px solid var(--accent-500);
   outline-offset: 1px;
 }
-
-.optionActive button {
-  background: color-mix(in srgb, var(--accent-500) 16%, var(--surface-0));
+.option button:hover {
+  outline: 2px solid var(--accent-400);
+  outline-offset: 1px;
 }

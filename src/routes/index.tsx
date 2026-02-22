@@ -90,8 +90,8 @@ const searchSchema = z.object({
 
 const themeStorageKey = 'workout-tracker-theme'
 const languageStorageKey = 'workout-tracker-language'
-const themeMetaLight = '#13212f'
-const themeMetaDark = '#0f161d'
+const themeMetaLight = '#fbfcff'
+const themeMetaDark = '#1a1c24'
 
 type ThemeMode = 'light' | 'dark'
 

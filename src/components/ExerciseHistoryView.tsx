@@ -10,6 +10,7 @@ import { resolveFreeExerciseDbEntry } from "@/lib/exerciseImages";
 import type { FreeExerciseDbEntry } from "@/lib/exerciseImages";
 import { getFreeExerciseDbExerciseNames } from "@/lib/exerciseImages";
 import { getCopy, getDateLocale, type AppLanguage } from "@/lib/i18n";
+import { buildExerciseDetailTarget } from "@/lib/exerciseDetailRoute";
 import { getExerciseProgressSummaries } from "@/lib/selectors";
 import type { ExerciseProgressSummary } from "@/lib/selectors";
 import type { Workout } from "@/lib/types";
@@ -330,12 +331,12 @@ export function ExerciseHistoryView({
     };
   }, [entries]);
 
-  const handleSubmitExercise = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addExerciseByName = async (rawName: string) => {
     if (isAddingExercise) {
       return;
     }
-    const nextName = newExerciseName.trim();
+
+    const nextName = rawName.trim();
     if (!nextName) {
       return;
     }
@@ -347,6 +348,11 @@ export function ExerciseHistoryView({
     } finally {
       setIsAddingExercise(false);
     }
+  };
+
+  const handleSubmitExercise = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await addExerciseByName(newExerciseName);
   };
 
   const normalizeValue = (value?: string): string | undefined => {
@@ -523,6 +529,9 @@ export function ExerciseHistoryView({
           placeholder={copy.historyView.addExercisePlaceholder}
           suggestions={addExerciseSuggestions}
           onChange={setNewExerciseName}
+          onSuggestionSelect={(suggestion) => {
+            void addExerciseByName(suggestion);
+          }}
         />
         <button
           type="submit"
@@ -629,28 +638,26 @@ export function ExerciseHistoryView({
           onCardClick={(item) => {
             const entry = item.data as ExerciseProgressSummary | undefined;
             if (entry) {
+              const target = buildExerciseDetailTarget(entry);
+              const nextSearch = {
+                types:
+                  selectedTypeIds.length > 0
+                    ? selectedTypeIds.join(",")
+                    : undefined,
+                exMuscle: selectedFilters.muscle,
+                exEquipment: selectedFilters.equipment,
+                exDifficulty: selectedFilters.difficulty,
+                exCategory: selectedFilters.category,
+                entryKey: target.entryKey,
+              };
+              const hasSearchState = Object.values(nextSearch).some(Boolean);
+
               navigate({
                 to: "/exercises/$name",
                 params: {
-                  name: getCatalogExerciseIdByName(entry.name) || entry.key,
+                  name: target.routeName,
                 },
-                search:
-                  selectedTypeIds.length > 0 ||
-                  selectedFilters.muscle ||
-                  selectedFilters.equipment ||
-                  selectedFilters.difficulty ||
-                  selectedFilters.category
-                    ? {
-                        types:
-                          selectedTypeIds.length > 0
-                            ? selectedTypeIds.join(",")
-                            : undefined,
-                        exMuscle: selectedFilters.muscle,
-                        exEquipment: selectedFilters.equipment,
-                        exDifficulty: selectedFilters.difficulty,
-                        exCategory: selectedFilters.category,
-                      }
-                    : {},
+                search: hasSearchState ? nextSearch : {},
               });
             }
           }}

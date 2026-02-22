@@ -37,7 +37,7 @@
 .wrapper select,
 .wrapper textarea {
   border: 1px solid var(--ink-250);
-  border-radius: 9px;
+  border-radius: 7px;
   padding: 0.45rem 0.6rem;
   font-family: inherit;
 }
@@ -52,7 +52,7 @@
 
 .exerciseRow {
   border: 1px solid var(--ink-150);
-  border-radius: 14px;
+  border-radius: 6px;
   padding: 0.9rem;
   display: grid;
   gap: 0.85rem;
@@ -100,7 +100,7 @@
 .referenceCard {
   grid-area: reference;
   border: 1px solid var(--ink-200);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 0.45rem;
   background: color-mix(in srgb, var(--surface-0) 80%, var(--surface-1));
   display: grid;
@@ -109,7 +109,7 @@
 
 .referenceImageFrame {
   position: relative;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -135,7 +135,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--ink-150);
   display: block;
 }

@@ -1,5 +1,4 @@
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
-import { gsap } from 'gsap';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import './ChromaGrid.css';
 
 export interface ChromaItem {
@@ -25,12 +24,9 @@ export interface ChromaGridProps {
   damping?: number;
   fadeOut?: number;
   ease?: string;
-  imageCycleHint?: string;
   onCardClick?: (item: ChromaItem, index: number) => void;
   selectedIndex?: number | null;
 }
-
-type SetterFn = (v: number | string) => void;
 
 export const ChromaGrid = ({
   items,
@@ -41,15 +37,15 @@ export const ChromaGrid = ({
   damping = 0.45,
   fadeOut = 0.6,
   ease = 'power3.out',
-  imageCycleHint,
   selectedIndex = null,
   onCardClick,
 }: ChromaGridProps) => {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const fadeRef = useRef<HTMLDivElement>(null);
-  const setX = useRef<SetterFn | null>(null);
-  const setY = useRef<SetterFn | null>(null);
-  const pos = useRef({ x: 0, y: 0 });
+  void radius;
+  void rows;
+  void damping;
+  void fadeOut;
+  void ease;
+
   const [imageIndexByCard, setImageIndexByCard] = useState<Record<string, number>>({});
 
   const demo: ChromaItem[] = [
@@ -121,45 +117,6 @@ export const ChromaGrid = ({
     });
   }, [data]);
 
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    setX.current = gsap.quickSetter(el, '--x', 'px') as SetterFn;
-    setY.current = gsap.quickSetter(el, '--y', 'px') as SetterFn;
-    const { width, height } = el.getBoundingClientRect();
-    pos.current = { x: width / 2, y: height / 2 };
-    setX.current(pos.current.x);
-    setY.current(pos.current.y);
-  }, []);
-
-  const moveTo = (x: number, y: number) => {
-    gsap.to(pos.current, {
-      x,
-      y,
-      duration: damping,
-      ease,
-      onUpdate: () => {
-        setX.current?.(pos.current.x);
-        setY.current?.(pos.current.y);
-      },
-      overwrite: true
-    });
-  };
-
-  const handleMove = (e: React.PointerEvent) => {
-    const r = rootRef.current!.getBoundingClientRect();
-    moveTo(e.clientX - r.left, e.clientY - r.top);
-    gsap.to(fadeRef.current, { opacity: 0, duration: 0.25, overwrite: true });
-  };
-
-  const handleLeave = () => {
-    gsap.to(fadeRef.current, {
-      opacity: 1,
-      duration: fadeOut,
-      overwrite: true
-    });
-  };
-
   const handleCardClick = (item: ChromaItem, index: number) => {
     if (onCardClick) {
       onCardClick(item, index);
@@ -171,28 +128,14 @@ export const ChromaGrid = ({
     }
   };
 
-  const handleCardMove: React.MouseEventHandler<HTMLElement> = e => {
-    const card = e.currentTarget as HTMLElement;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    card.style.setProperty('--mouse-x', `${x}px`);
-    card.style.setProperty('--mouse-y', `${y}px`);
-  };
-
   return (
     <div
-      ref={rootRef}
       className={`chroma-grid ${className}`}
       style={
         {
-          '--r': `${radius}px`,
           '--cols': columns,
-          '--rows': rows
         } as CSSProperties
       }
-      onPointerMove={handleMove}
-      onPointerLeave={handleLeave}
     >
       {data.map((c, i) => {
         const cardKey = `${c.title}_${i}`;
@@ -206,22 +149,23 @@ export const ChromaGrid = ({
         <article
           key={i}
           className={`chroma-card${selectedIndex === i ? ' chroma-card-selected' : ''}`}
-          onMouseMove={handleCardMove}
           onClick={() => handleCardClick(c, i)}
           onKeyDown={(event) => {
+            if (!isClickable) {
+              return;
+            }
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               handleCardClick(c, i);
             }
           }}
-          role="button"
-          tabIndex={0}
-          aria-label={`Open details for ${c.title}`}
-          aria-pressed={selectedIndex === i}
+          role={isClickable ? 'button' : undefined}
+          tabIndex={isClickable ? 0 : -1}
+          aria-label={isClickable ? `Open details for ${c.title}` : undefined}
+          aria-pressed={isClickable ? selectedIndex === i : undefined}
           style={
             {
-              '--card-border': c.borderColor || 'transparent',
-              '--card-gradient': c.gradient,
+              '--card-border': c.borderColor || 'var(--accent-500)',
               cursor: isClickable ? 'pointer' : 'default'
             } as CSSProperties
           }
@@ -272,16 +216,11 @@ export const ChromaGrid = ({
             {c.handle && <span className="handle">{c.handle}</span>}
             {c.subtitle ? <p className="role">{c.subtitle}</p> : null}
             {c.location && <span className="location">{c.location}</span>}
-            {canCycleImages && imageCycleHint ? (
-              <span className="chroma-image-hint">{imageCycleHint}</span>
-            ) : null}
             {c.detail ? <div className="chroma-detail">{c.detail}</div> : null}
           </footer>
         </article>
         );
       })}
-      <div className="chroma-overlay" />
-      <div ref={fadeRef} className="chroma-fade" />
     </div>
   );
 };

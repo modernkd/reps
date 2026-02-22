@@ -9,7 +9,7 @@
   --accent: var(--pill-accent, var(--ink-300));
   border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--ink-300));
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-0));
-  color: var(--ink-800);
+  color: var(--color-slate-12);
   border-radius: var(--radius-control);
   padding: 0.45rem 0.85rem;
   font-size: 0.9rem;
@@ -20,7 +20,9 @@
   justify-content: center;
   white-space: nowrap;
   cursor: pointer;
-  transition: transform 140ms ease, background-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease;
 }
 
 .pill:hover {

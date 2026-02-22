@@ -1,6 +1,6 @@
 .panel {
   border: 1px solid var(--ink-200);
-  border-radius: 16px;
+  border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
   display: grid;
@@ -93,7 +93,7 @@
   padding: 0.4rem;
   min-width: 14rem;
   border: 1px solid var(--ink-250);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
 }
@@ -140,7 +140,7 @@
   align-items: flex-start;
   gap: 0.6rem;
   border: 1px solid var(--ink-150);
-  border-radius: 12px;
+  border-radius: 7px;
   padding: 0.65rem;
 }
 
@@ -173,7 +173,7 @@
 
 .actions button {
   border: 1px solid var(--ink-250);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--surface-0);
   color: var(--ink-900);
   font-size: 0.78rem;
@@ -274,7 +274,7 @@
 @media (max-width: 520px) {
   .panel {
     padding: 0.75rem;
-    border-radius: 13px;
+    border-radius: 6px;
   }
 
   .header h3 {

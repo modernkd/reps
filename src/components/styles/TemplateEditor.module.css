@@ -13,7 +13,7 @@
 .wrapper input,
 .wrapper select {
   border: 1px solid var(--ink-250);
-  border-radius: 0.75rem;
+  border-radius: 0.6rem;
   padding: 0.45rem 0.58rem;
   background: var(--surface-0);
   color: var(--ink-900);
@@ -89,7 +89,7 @@
 
 .referenceCard {
   border: 1px solid var(--ink-200);
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 0.35rem;
   background: color-mix(in srgb, var(--surface-0) 80%, var(--surface-1));
   min-width: 180px;
@@ -98,7 +98,7 @@
 
 .referenceImageFrame {
   position: relative;
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
@@ -118,7 +118,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--ink-150);
   display: block;
 }

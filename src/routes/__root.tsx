@@ -29,7 +29,7 @@ const themeInitializationScript = `
 
   var themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) {
-    themeMeta.setAttribute('content', theme === 'dark' ? '#0f161d' : '#13212f');
+    themeMeta.setAttribute('content', theme === 'dark' ? '#1a1c24' : '#fbfcff');
   }
 })();
 `
@@ -63,7 +63,7 @@ export const Route = createRootRoute({
       },
       {
         name: 'theme-color',
-        content: '#0f161d',
+        content: '#1a1c24',
       },
       {
         property: 'og:type',

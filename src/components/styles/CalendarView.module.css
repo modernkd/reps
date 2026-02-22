@@ -1,6 +1,6 @@
 .wrapper {
   border: 1px solid var(--ink-200);
-  border-radius: 16px;
+  border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
   overflow: clip;
@@ -48,7 +48,7 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   border-bottom: 1px solid var(--ink-100);
   padding: 0.6rem 0.5rem;
-  color: var(--ink-600);
+  color: var(--color-slate-11);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -71,14 +71,17 @@
 
 .day {
   border: 1px solid var(--ink-150);
-  border-radius: 12px;
+  border-radius: 7px;
   background: var(--surface-0);
   min-height: clamp(3.85rem, 13vw, 5.3rem);
   padding: 0.4rem;
   text-align: left;
   display: grid;
   grid-template-rows: auto 1fr;
-  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
   cursor: pointer;
   touch-action: manipulation;
   contain: paint;
@@ -104,7 +107,7 @@
   font-style: normal;
   font-size: 0.68rem;
   line-height: 1.15;
-  color: var(--ink-600);
+  color: var(--color-slate-11);
   white-space: nowrap;
 }
 
@@ -172,7 +175,7 @@
   }
 
   .day {
-    border-radius: 10px;
+    border-radius: 6px;
     padding: 0.34rem;
   }
 
@@ -212,7 +215,7 @@
   }
 
   .day {
-    border-radius: 9px;
+    border-radius: 7px;
     min-height: 0;
     aspect-ratio: 1 / 0.92;
     padding: 0.26rem;
@@ -249,7 +252,7 @@
   }
 
   .day {
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 0.22rem;
   }
 

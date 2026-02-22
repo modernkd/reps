@@ -3,10 +3,6 @@
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--accent-200) 34%, transparent), transparent 55%),
-    radial-gradient(circle at 100% 20%, color-mix(in srgb, var(--accent-100) 55%, transparent), transparent 46%),
-    var(--surface-1);
 }
 
 .container {
@@ -38,7 +34,7 @@
 
 .emptyState {
   border: 1px dashed var(--ink-300);
-  border-radius: 12px;
+  border-radius: 7px;
   background: var(--surface-0);
   color: var(--ink-700);
   padding: 0.85rem;
@@ -52,14 +48,14 @@
 .error {
   border: 1px solid color-mix(in srgb, var(--danger-500) 50%, var(--ink-250));
   background: color-mix(in srgb, var(--danger-500) 12%, var(--surface-0));
-  border-radius: 12px;
+  border-radius: 7px;
   color: var(--danger-700);
   padding: 0.65rem 0.8rem;
 }
 
 .floatingCard {
   border: 1px solid var(--ink-200);
-  border-radius: 16px;
+  border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-2);
   padding: 0.9rem;
@@ -76,7 +72,7 @@
   margin: 0 auto;
   border: 1px solid color-mix(in srgb, var(--danger-500) 50%, var(--ink-250));
   background: color-mix(in srgb, var(--danger-500) 12%, var(--surface-0));
-  border-radius: 12px;
+  border-radius: 7px;
   color: var(--danger-700);
   padding: 0.65rem 0.8rem;
 }
@@ -111,7 +107,7 @@
   .workoutModeError,
   .error,
   .emptyState {
-    border-radius: 12px;
+    border-radius: 7px;
     padding: 0.75rem;
   }
 }

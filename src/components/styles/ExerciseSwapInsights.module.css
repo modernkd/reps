@@ -1,6 +1,6 @@
 .root {
   border: 1px solid var(--ink-180);
-  border-radius: 11px;
+  border-radius: 6px;
   padding: 0.65rem;
   background: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
   display: grid;
@@ -15,7 +15,7 @@
 
 .swapBlock {
   border: 1px solid var(--ink-160);
-  border-radius: 9px;
+  border-radius: 7px;
   background: color-mix(in srgb, var(--surface-0) 94%, var(--surface-1));
   padding: 0.48rem;
   display: grid;
@@ -46,7 +46,7 @@
 .optionButton {
   width: 100%;
   border: 1px solid var(--ink-220);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--surface-0);
   color: var(--ink-900);
   text-align: left;
