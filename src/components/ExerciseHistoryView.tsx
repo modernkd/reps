@@ -16,15 +16,6 @@ import type { ExerciseProgressSummary } from "@/lib/selectors";
 import type { Workout } from "@/lib/types";
 import { getCatalogExerciseIdByName } from "@/lib/variants";
 
-const CARD_GRADIENTS = [
-  "linear-gradient(180deg, rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(135deg, #4f46e5, #0f172a)",
-  "linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(155deg, #10b981, #0f172a)",
-  "linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(145deg, #fb923c, #0f172a)",
-  "linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(160deg, #22d3ee, #0f172a)",
-  "linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(170deg, #8b5cf6, #0f172a)",
-  "linear-gradient(180deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.94)), linear-gradient(150deg, #fb7185, #0f172a)",
-];
-
 const INITIAL_VISIBLE_LOGS = 3;
 const LOAD_MORE_STEP = 3;
 const MAX_WEIGHT_POINTS = 10;
@@ -579,7 +570,7 @@ export function ExerciseHistoryView({
     );
   }
 
-  const formattedItems = filteredEntries.map((entry, index) => {
+  const formattedItems = filteredEntries.map((entry) => {
     const referenceContent = referenceContentByExercise[entry.key];
     const exerciseImageId = getCatalogExerciseIdByName(entry.name);
     const fallbackImage = exerciseImageId
@@ -588,8 +579,6 @@ export function ExerciseHistoryView({
     const referenceImages = referenceContent?.images.length
       ? referenceContent.images
       : [fallbackImage];
-    const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-
     return {
       image: referenceImages[0],
       images: referenceImages,
@@ -609,7 +598,6 @@ export function ExerciseHistoryView({
         entry.totalLogs > 0 && entry.lastWeightKg !== null
           ? copy.historyView.lastWeight(entry.lastWeightKg)
           : undefined,
-      gradient,
       data: entry,
     };
   });
@@ -632,9 +620,6 @@ export function ExerciseHistoryView({
           columns={3}
           rows={2}
           className={styles.grid}
-          damping={0.4}
-          fadeOut={0.65}
-          imageCycleHint={copy.historyView.cycleImageHint}
           onCardClick={(item) => {
             const entry = item.data as ExerciseProgressSummary | undefined;
             if (entry) {
