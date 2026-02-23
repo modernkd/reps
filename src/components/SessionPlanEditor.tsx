@@ -1,47 +1,50 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { format, parseISO } from 'date-fns'
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { format, parseISO } from "date-fns";
 
 import {
   readFileAsDataUrl,
   saveUploadedExerciseImage,
-} from '@/lib/exerciseImages'
-import type { AppLanguage } from '@/lib/i18n'
-import { getCopy, getDateLocale } from '@/lib/i18n'
+} from "@/lib/exerciseImages";
+import type { AppLanguage } from "@/lib/i18n";
+import { getCopy, getDateLocale } from "@/lib/i18n";
 import {
   getCatalogExerciseVariants,
   isCustomExerciseVariant,
-} from '@/lib/variants'
-import { useExerciseReferenceContent } from '@/lib/useExerciseReferenceContent'
-import type { SessionPlan } from '@/lib/types'
-import { createId } from '@/lib/ids'
-import type { ExerciseHistoryEntry } from '@/lib/selectors'
+} from "@/lib/variants";
+import { useExerciseReferenceContent } from "@/lib/useExerciseReferenceContent";
+import type { SessionPlan } from "@/lib/types";
+import { createId } from "@/lib/ids";
+import type { ExerciseHistoryEntry } from "@/lib/selectors";
 
-import { ExerciseSwapInsights } from './ExerciseSwapInsights'
-import styles from './styles/SessionPlanEditor.module.css'
+import { ExerciseSwapInsights } from "./ExerciseSwapInsights";
+import styles from "./styles/SessionPlanEditor.module.css";
 
 type SessionPlanEditorProps = {
-  language: AppLanguage
-  plan: SessionPlan
-  exerciseHistory: ExerciseHistoryEntry[]
-  onSave: (nextPlan: SessionPlan) => Promise<void>
-  onCancel: () => void
-}
+  language: AppLanguage;
+  plan: SessionPlan;
+  exerciseHistory: ExerciseHistoryEntry[];
+  onSave: (nextPlan: SessionPlan) => Promise<void>;
+  onCancel: () => void;
+};
 
-type SessionExercise = SessionPlan['exercises'][number]
+type SessionExercise = SessionPlan["exercises"][number];
 
 function exerciseSuggestionListId(exerciseId: string, index: number): string {
-  return `session_exercise_variant_${exerciseId}_${index}`
+  return `session_exercise_variant_${exerciseId}_${index}`;
 }
 
 type SessionExerciseRowProps = {
-  language: AppLanguage
-  exercise: SessionExercise
-  index: number
-  imageRefreshKey: number
-  onExerciseChange: (index: number, updater: (exercise: SessionExercise) => SessionExercise) => void
-  onUploadApplied: () => void
-  historyEntry?: ExerciseHistoryEntry
-}
+  language: AppLanguage;
+  exercise: SessionExercise;
+  index: number;
+  imageRefreshKey: number;
+  onExerciseChange: (
+    index: number,
+    updater: (exercise: SessionExercise) => SessionExercise,
+  ) => void;
+  onUploadApplied: () => void;
+  historyEntry?: ExerciseHistoryEntry;
+};
 
 function SessionExerciseRow({
   language,
@@ -52,55 +55,55 @@ function SessionExerciseRow({
   onUploadApplied,
   historyEntry,
 }: SessionExerciseRowProps) {
-  const copy = getCopy(language)
-  const variants = getCatalogExerciseVariants(exercise.id)
-  const listId = exerciseSuggestionListId(exercise.id, index)
-  const customExercise = isCustomExerciseVariant(exercise.id, exercise.name)
-  const [referenceImageIndex, setReferenceImageIndex] = useState(0)
+  const copy = getCopy(language);
+  const variants = getCatalogExerciseVariants(exercise.id);
+  const listId = exerciseSuggestionListId(exercise.id, index);
+  const customExercise = isCustomExerciseVariant(exercise.id, exercise.name);
+  const [referenceImageIndex, setReferenceImageIndex] = useState(0);
   const { content, isLoading } = useExerciseReferenceContent(
     exercise.id,
     exercise.name,
     imageRefreshKey,
-  )
-  const referenceImages = content?.images ?? []
+  );
+  const referenceImages = content?.images ?? [];
   const currentReferenceImageIndex = referenceImages.length
     ? referenceImageIndex % referenceImages.length
-    : 0
+    : 0;
   const activeReferenceImage = referenceImages.length
     ? referenceImages[currentReferenceImageIndex]
-    : undefined
-  const canCycleReferenceImages = referenceImages.length > 1
+    : undefined;
+  const canCycleReferenceImages = referenceImages.length > 1;
 
   useEffect(() => {
-    setReferenceImageIndex(0)
-  }, [exercise.id, exercise.name, imageRefreshKey, referenceImages.length])
+    setReferenceImageIndex(0);
+  }, [exercise.id, exercise.name, imageRefreshKey, referenceImages.length]);
 
   const historyWeight =
     historyEntry && historyEntry.lastWeightKg !== null
       ? Number(historyEntry.lastWeightKg.toFixed(1))
-      : null
+      : null;
   const historyDateLabel = historyEntry
-    ? format(parseISO(historyEntry.lastDate), 'MMM d', {
+    ? format(parseISO(historyEntry.lastDate), "MMM d", {
         locale: getDateLocale(language),
       })
-    : ''
+    : "";
 
   const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.currentTarget.value = ''
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
 
     if (!file || !exercise.name.trim()) {
-      return
+      return;
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file)
-      saveUploadedExerciseImage(exercise.name, dataUrl)
-      onUploadApplied()
+      const dataUrl = await readFileAsDataUrl(file);
+      saveUploadedExerciseImage(exercise.name, dataUrl);
+      onUploadApplied();
     } catch {
       // Keep editor interactive even if file reading fails.
     }
-  }
+  };
 
   return (
     <li className={styles.exerciseRow}>
@@ -111,7 +114,10 @@ function SessionExerciseRow({
           value={exercise.name}
           placeholder={copy.sessionPlan.exerciseVariantPlaceholder}
           onChange={(event) =>
-            onExerciseChange(index, (current) => ({ ...current, name: event.target.value }))
+            onExerciseChange(index, (current) => ({
+              ...current,
+              name: event.target.value,
+            }))
           }
         />
         <datalist id={listId}>
@@ -129,10 +135,12 @@ function SessionExerciseRow({
               className={styles.referenceImageButton}
               onClick={() => {
                 if (!canCycleReferenceImages) {
-                  return
+                  return;
                 }
 
-                setReferenceImageIndex((current) => (current + 1) % referenceImages.length)
+                setReferenceImageIndex(
+                  (current) => (current + 1) % referenceImages.length,
+                );
               }}
               aria-label={
                 canCycleReferenceImages
@@ -174,7 +182,9 @@ function SessionExerciseRow({
 
         {customExercise ? (
           <>
-            <p className={styles.referenceHint}>{copy.sessionPlan.customExerciseHint}</p>
+            <p className={styles.referenceHint}>
+              {copy.sessionPlan.customExerciseHint}
+            </p>
             <label className={styles.uploadButton}>
               {copy.sessionPlan.uploadCustomImage}
               <input type="file" accept="image/*" onChange={handleUpload} />
@@ -209,11 +219,13 @@ function SessionExerciseRow({
           <input
             type="number"
             min={1}
-            value={exercise.minReps ?? ''}
+            value={exercise.minReps ?? ""}
             onChange={(event) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                minReps: event.target.value ? Number(event.target.value) : undefined,
+                minReps: event.target.value
+                  ? Number(event.target.value)
+                  : undefined,
               }))
             }
           />
@@ -224,11 +236,13 @@ function SessionExerciseRow({
           <input
             type="number"
             min={1}
-            value={exercise.maxReps ?? ''}
+            value={exercise.maxReps ?? ""}
             onChange={(event) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                maxReps: event.target.value ? Number(event.target.value) : undefined,
+                maxReps: event.target.value
+                  ? Number(event.target.value)
+                  : undefined,
               }))
             }
           />
@@ -239,11 +253,13 @@ function SessionExerciseRow({
           <input
             type="number"
             min={15}
-            value={exercise.restSecDefault ?? ''}
+            value={exercise.restSecDefault ?? ""}
             onChange={(event) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                restSecDefault: event.target.value ? Number(event.target.value) : undefined,
+                restSecDefault: event.target.value
+                  ? Number(event.target.value)
+                  : undefined,
               }))
             }
           />
@@ -255,11 +271,13 @@ function SessionExerciseRow({
             type="number"
             min={0}
             step={0.5}
-            value={exercise.targetMassKg ?? ''}
+            value={exercise.targetMassKg ?? ""}
             onChange={(event) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                targetMassKg: event.target.value ? Number(event.target.value) : undefined,
+                targetMassKg: event.target.value
+                  ? Number(event.target.value)
+                  : undefined,
               }))
             }
           />
@@ -271,24 +289,29 @@ function SessionExerciseRow({
           language={language}
           exerciseName={exercise.name}
           onSwap={(nextExerciseName) =>
-            onExerciseChange(index, (current) => ({ ...current, name: nextExerciseName }))
+            onExerciseChange(index, (current) => ({
+              ...current,
+              name: nextExerciseName,
+            }))
           }
         />
       </div>
     </li>
-  )
+  );
 }
 
-function createSessionExercise(overrides: Partial<SessionExercise> = {}): SessionExercise {
+function createSessionExercise(
+  overrides: Partial<SessionExercise> = {},
+): SessionExercise {
   return {
-    id: overrides.id ?? createId('exercise'),
-    name: overrides.name ?? '',
+    id: overrides.id ?? createId("exercise"),
+    name: overrides.name ?? "",
     sets: overrides.sets ?? 3,
     minReps: overrides.minReps,
     maxReps: overrides.maxReps,
     restSecDefault: overrides.restSecDefault,
     targetMassKg: overrides.targetMassKg,
-  }
+  };
 }
 
 export function SessionPlanEditor({
@@ -298,11 +321,11 @@ export function SessionPlanEditor({
   onSave,
   onCancel,
 }: SessionPlanEditorProps) {
-  const copy = getCopy(language)
-  const [draft, setDraft] = useState<SessionPlan>(plan)
-  const [isSaving, setIsSaving] = useState(false)
-  const [imageRefreshKey, setImageRefreshKey] = useState(0)
-  const [selectedExistingExercise, setSelectedExistingExercise] = useState('')
+  const copy = getCopy(language);
+  const [draft, setDraft] = useState<SessionPlan>(plan);
+  const [isSaving, setIsSaving] = useState(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  const [selectedExistingExercise, setSelectedExistingExercise] = useState("");
 
   const normalized = useMemo(
     () => ({
@@ -321,45 +344,45 @@ export function SessionPlanEditor({
       })),
     }),
     [draft],
-  )
+  );
 
   const historyLookup = useMemo(() => {
-    const map = new Map<string, ExerciseHistoryEntry>()
+    const map = new Map<string, ExerciseHistoryEntry>();
     exerciseHistory.forEach((entry) => {
-      map.set(entry.name.trim().toLowerCase(), entry)
-    })
-    return map
-  }, [exerciseHistory])
+      map.set(entry.name.trim().toLowerCase(), entry);
+    });
+    return map;
+  }, [exerciseHistory]);
 
   const appendExercise = (exercise: SessionExercise) => {
     setDraft((current) => ({
       ...current,
       exercises: [...current.exercises, exercise],
-    }))
-  }
+    }));
+  };
 
   const handleAddHistoryExercise = () => {
     if (!selectedExistingExercise) {
-      return
+      return;
     }
 
-    const normalizedSelection = selectedExistingExercise.trim().toLowerCase()
-    const historyEntry = historyLookup.get(normalizedSelection)
+    const normalizedSelection = selectedExistingExercise.trim().toLowerCase();
+    const historyEntry = historyLookup.get(normalizedSelection);
     if (!historyEntry) {
-      return
+      return;
     }
 
     appendExercise(
       createSessionExercise({
         name: historyEntry.name,
       }),
-    )
-    setSelectedExistingExercise('')
-  }
+    );
+    setSelectedExistingExercise("");
+  };
 
   const handleAddCustomExercise = () => {
-    appendExercise(createSessionExercise())
-  }
+    appendExercise(createSessionExercise());
+  };
 
   const updateExercise = (
     index: number,
@@ -370,17 +393,17 @@ export function SessionPlanEditor({
       exercises: current.exercises.map((exercise, exerciseIndex) =>
         exerciseIndex === index ? updater(exercise) : exercise,
       ),
-    }))
-  }
+    }));
+  };
 
   const save = async () => {
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await onSave(normalized)
+      await onSave(normalized);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   return (
     <div className={styles.wrapper}>
@@ -399,7 +422,7 @@ export function SessionPlanEditor({
         <textarea
           rows={3}
           placeholder={copy.sessionPlan.notesPlaceholder}
-          value={draft.notes ?? ''}
+          value={draft.notes ?? ""}
           onChange={(event) =>
             setDraft((current) => ({
               ...current,
@@ -415,13 +438,19 @@ export function SessionPlanEditor({
             {copy.sessionPlan.chooseExistingExercise}
             <select
               value={selectedExistingExercise}
-              onChange={(event) => setSelectedExistingExercise(event.target.value)}
+              onChange={(event) =>
+                setSelectedExistingExercise(event.target.value)
+              }
             >
-              <option value="">{copy.sessionPlan.existingExercisePlaceholder}</option>
+              <option value="">
+                {copy.sessionPlan.existingExercisePlaceholder}
+              </option>
               {exerciseHistory.map((entry) => (
                 <option key={entry.name} value={entry.name}>
                   {entry.name}
-                  {entry.lastWeightKg !== null ? ` · ${entry.lastWeightKg} kg` : ''}
+                  {entry.lastWeightKg !== null
+                    ? ` · ${entry.lastWeightKg} kg`
+                    : ""}
                 </option>
               ))}
             </select>
@@ -430,7 +459,11 @@ export function SessionPlanEditor({
           <p className={styles.historyHint}>{copy.sessionPlan.historyEmpty}</p>
         )}
         <div className={styles.toolbarActions}>
-          <button type="button" className={styles.ghost} onClick={handleAddCustomExercise}>
+          <button
+            type="button"
+            className={styles.ghost}
+            onClick={handleAddCustomExercise}
+          >
             {copy.sessionPlan.addCustomExercise}
           </button>
           {exerciseHistory.length > 0 ? (
@@ -469,10 +502,15 @@ export function SessionPlanEditor({
         <button type="button" onClick={onCancel} className={styles.ghost}>
           {copy.common.cancel}
         </button>
-        <button type="button" onClick={save} disabled={isSaving} className={styles.primary}>
+        <button
+          type="button"
+          onClick={save}
+          disabled={isSaving}
+          className={styles.primary}
+        >
           {isSaving ? copy.common.saving : copy.sessionPlan.savePlan}
         </button>
       </div>
     </div>
-  )
+  );
 }

@@ -1,15 +1,15 @@
-import clsx from 'clsx'
+import clsx from "clsx";
 
-import { getCopy, type AppLanguage } from '@/lib/i18n'
+import { getCopy, type AppLanguage } from "@/lib/i18n";
 
-import styles from './styles/AppFooterControls.module.css'
+import styles from "./styles/AppFooterControls.module.css";
 
 type AppFooterControlsProps = {
-  language: AppLanguage
-  theme: 'light' | 'dark'
-  onLanguageChange: (language: AppLanguage) => void
-  onToggleTheme: () => void
-}
+  language: AppLanguage;
+  theme: "light" | "dark";
+  onLanguageChange: (language: AppLanguage) => void;
+  onToggleTheme: () => void;
+};
 
 export function AppFooterControls({
   language,
@@ -17,13 +17,15 @@ export function AppFooterControls({
   onLanguageChange,
   onToggleTheme,
 }: AppFooterControlsProps) {
-  const copy = getCopy(language)
-  const isDark = theme === 'dark'
-  const nextLanguage = language === 'en' ? 'sv' : 'en'
-  const themeToggleLabel = isDark ? copy.appHeader.useLightMode : copy.appHeader.useDarkMode
+  const copy = getCopy(language);
+  const isDark = theme === "dark";
+  const nextLanguage = language === "en" ? "sv" : "en";
+  const themeToggleLabel = isDark
+    ? copy.appHeader.useLightMode
+    : copy.appHeader.useDarkMode;
   const languageToggleLabel = `${copy.appHeader.languageSwitcherAria}: ${
-    nextLanguage === 'en' ? copy.appHeader.english : copy.appHeader.swedish
-  }`
+    nextLanguage === "en" ? copy.appHeader.english : copy.appHeader.swedish
+  }`;
 
   return (
     <footer className={styles.wrapper}>
@@ -75,14 +77,16 @@ export function AppFooterControls({
               type="button"
               className={styles.iconButton}
               onClick={() => onLanguageChange(nextLanguage)}
-              aria-pressed={language === 'sv'}
+              aria-pressed={language === "sv"}
               aria-label={languageToggleLabel}
             >
               <span className={styles.langTrack} aria-hidden="true">
                 <span
                   className={clsx(
                     styles.langGlyph,
-                    language === 'en' ? styles.langVisible : styles.langHiddenTop,
+                    language === "en"
+                      ? styles.langVisible
+                      : styles.langHiddenTop,
                   )}
                 >
                   EN
@@ -90,7 +94,9 @@ export function AppFooterControls({
                 <span
                   className={clsx(
                     styles.langGlyph,
-                    language === 'sv' ? styles.langVisible : styles.langHiddenBottom,
+                    language === "sv"
+                      ? styles.langVisible
+                      : styles.langHiddenBottom,
                   )}
                 >
                   SE
@@ -101,5 +107,5 @@ export function AppFooterControls({
         </div>
       </div>
     </footer>
-  )
+  );
 }

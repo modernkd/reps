@@ -1,277 +1,297 @@
-import { getCatalogExerciseIdByName, isCustomExerciseVariant } from './variants'
-import { defaultExercisesData } from './defaultExercisesData'
+import {
+  getCatalogExerciseIdByName,
+  isCustomExerciseVariant,
+} from "./variants";
+import { defaultExercisesData } from "./defaultExercisesData";
 
-const CUSTOM_IMAGE_STORAGE_KEY = 'workout-tracker.custom-exercise-images.v1'
-const LOCAL_FALLBACK_EXERCISE_ID = 'ex_bench_press'
+const CUSTOM_IMAGE_STORAGE_KEY = "workout-tracker.custom-exercise-images.v1";
+const LOCAL_FALLBACK_EXERCISE_ID = "ex_bench_press";
 
 export type ExerciseReferenceImage = {
-  url: string
-  source: 'uploaded' | 'commons' | 'db'
-}
+  url: string;
+  source: "uploaded" | "commons" | "db";
+};
 
 export type FreeExerciseDbEntry = {
-  id: string
-  name: string
-  category?: string
-  equipment?: string
-  force?: string
-  level?: string
-  mechanic?: string
-  primaryMuscles?: string[]
-  secondaryMuscles?: string[]
-  images?: string[]
-  instructions?: string[]
-}
+  id: string;
+  name: string;
+  category?: string;
+  equipment?: string;
+  force?: string;
+  level?: string;
+  mechanic?: string;
+  primaryMuscles?: string[];
+  secondaryMuscles?: string[];
+  images?: string[];
+  instructions?: string[];
+};
 
-type StoredCustomExerciseImages = Record<string, string>
+type StoredCustomExerciseImages = Record<string, string>;
 
 export type ExerciseReferenceContent = {
-  images: string[]
-  instructions: string[]
-  source: 'uploaded' | 'commons' | 'db'
-}
+  images: string[];
+  instructions: string[];
+  source: "uploaded" | "commons" | "db";
+};
 
 export function normalizeExerciseName(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, ' ')
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function readCustomImageStore(): StoredCustomExerciseImages {
-  if (typeof window === 'undefined') {
-    return {}
+  if (typeof window === "undefined") {
+    return {};
   }
 
   try {
-    const raw = window.localStorage.getItem(CUSTOM_IMAGE_STORAGE_KEY)
+    const raw = window.localStorage.getItem(CUSTOM_IMAGE_STORAGE_KEY);
     if (!raw) {
-      return {}
+      return {};
     }
 
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') {
-      return {}
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return {};
     }
 
-    return parsed as StoredCustomExerciseImages
+    return parsed as StoredCustomExerciseImages;
   } catch {
-    return {}
+    return {};
   }
 }
 
 function writeCustomImageStore(store: StoredCustomExerciseImages): void {
-  if (typeof window === 'undefined') {
-    return
+  if (typeof window === "undefined") {
+    return;
   }
 
   try {
-    window.localStorage.setItem(CUSTOM_IMAGE_STORAGE_KEY, JSON.stringify(store))
+    window.localStorage.setItem(
+      CUSTOM_IMAGE_STORAGE_KEY,
+      JSON.stringify(store),
+    );
   } catch {
     // Ignore failed persistence in private mode / restricted contexts.
   }
 }
 
-export function getUploadedExerciseImage(exerciseName: string): string | undefined {
-  const key = normalizeExerciseName(exerciseName)
+export function getUploadedExerciseImage(
+  exerciseName: string,
+): string | undefined {
+  const key = normalizeExerciseName(exerciseName);
   if (!key) {
-    return undefined
+    return undefined;
   }
 
-  const store = readCustomImageStore()
-  return store[key]
+  const store = readCustomImageStore();
+  return store[key];
 }
 
-export function saveUploadedExerciseImage(exerciseName: string, imageUrl: string): void {
-  const key = normalizeExerciseName(exerciseName)
+export function saveUploadedExerciseImage(
+  exerciseName: string,
+  imageUrl: string,
+): void {
+  const key = normalizeExerciseName(exerciseName);
   if (!key || !imageUrl) {
-    return
+    return;
   }
 
-  const next = readCustomImageStore()
-  next[key] = imageUrl
-  writeCustomImageStore(next)
+  const next = readCustomImageStore();
+  next[key] = imageUrl;
+  writeCustomImageStore(next);
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result)
-        return
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
       }
 
-      reject(new Error('Unable to read image file.'))
-    }
-    reader.onerror = () => reject(reader.error ?? new Error('Unable to read image file.'))
-    reader.readAsDataURL(file)
-  })
+      reject(new Error("Unable to read image file."));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Unable to read image file."));
+    reader.readAsDataURL(file);
+  });
 }
 
 // In-memory cache for the free-exercise-db JSON
-let freeExerciseDbCache: null | FreeExerciseDbEntry[] = null
-const exerciseReferenceContentCache = new Map<string, ExerciseReferenceContent>()
+let freeExerciseDbCache: null | FreeExerciseDbEntry[] = null;
+const exerciseReferenceContentCache = new Map<
+  string,
+  ExerciseReferenceContent
+>();
 
 async function getOrFetchFreeExerciseDb() {
-  if (freeExerciseDbCache) return freeExerciseDbCache
+  if (freeExerciseDbCache) return freeExerciseDbCache;
 
   const allowTestDbAccess =
-    typeof globalThis !== 'undefined' &&
+    typeof globalThis !== "undefined" &&
     (globalThis as { __ALLOW_EXERCISE_DB_IN_TEST__?: boolean })
-      .__ALLOW_EXERCISE_DB_IN_TEST__ === true
+      .__ALLOW_EXERCISE_DB_IN_TEST__ === true;
 
   if (
-    (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') ||
-    (typeof import.meta !== 'undefined' && (import.meta as { env?: { MODE?: string } }).env?.MODE === 'test')
+    (typeof process !== "undefined" && process.env.NODE_ENV === "test") ||
+    (typeof import.meta !== "undefined" &&
+      (import.meta as { env?: { MODE?: string } }).env?.MODE === "test")
   ) {
     if (!allowTestDbAccess) {
-      return null
+      return null;
     }
   }
 
   try {
-    const response = await fetch('https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json')
-    if (!response.ok) return null
-    const payload = await response.json()
+    const response = await fetch(
+      "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json",
+    );
+    if (!response.ok) return null;
+    const payload = await response.json();
     if (!Array.isArray(payload)) {
-      return null
+      return null;
     }
 
-    freeExerciseDbCache = payload as FreeExerciseDbEntry[]
-    return freeExerciseDbCache
+    freeExerciseDbCache = payload as FreeExerciseDbEntry[];
+    return freeExerciseDbCache;
   } catch {
-    return null
+    return null;
   }
 }
 
 export async function getFreeExerciseDbExerciseNames(): Promise<string[]> {
   // Delegate to central exerciseDb module
-  const { getAllExerciseNames } = await import('./exerciseDb')
-  return getAllExerciseNames()
+  const { getAllExerciseNames } = await import("./exerciseDb");
+  return getAllExerciseNames();
 }
 
 function buildFreeExerciseImageUrl(path: string): string {
-  return `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${path}`
+  return `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/${path}`;
 }
 
 function resolveExerciseImagePath(path: string): string {
-  const trimmed = path.trim()
+  const trimmed = path.trim();
   if (!trimmed) {
-    return trimmed
+    return trimmed;
   }
 
-  if (trimmed.startsWith('/images/') || /^https?:\/\//.test(trimmed)) {
-    return trimmed
+  if (trimmed.startsWith("/images/") || /^https?:\/\//.test(trimmed)) {
+    return trimmed;
   }
 
-  return buildFreeExerciseImageUrl(trimmed)
+  return buildFreeExerciseImageUrl(trimmed);
 }
 
 function matchFreeExerciseEntry(
   db: FreeExerciseDbEntry[],
   exerciseName: string,
 ): FreeExerciseDbEntry | undefined {
-  const normalizedSearchName = normalizeExerciseName(exerciseName)
+  const normalizedSearchName = normalizeExerciseName(exerciseName);
   if (!normalizedSearchName) {
-    return undefined
+    return undefined;
   }
 
   return db.find((entry) => {
-    const normalizedEntryName = normalizeExerciseName(entry.name)
+    const normalizedEntryName = normalizeExerciseName(entry.name);
     return (
       normalizedEntryName === normalizedSearchName ||
       normalizedEntryName.includes(normalizedSearchName) ||
       normalizedSearchName.includes(normalizedEntryName)
-    )
-  })
+    );
+  });
 }
 
-export async function resolveFreeExerciseDbEntry(exerciseName: string): Promise<FreeExerciseDbEntry | undefined> {
+export async function resolveFreeExerciseDbEntry(
+  exerciseName: string,
+): Promise<FreeExerciseDbEntry | undefined> {
   // Delegate to central exerciseDb module
-  const { getExerciseByName } = await import('./exerciseDb')
-  return getExerciseByName(exerciseName)
+  const { getExerciseByName } = await import("./exerciseDb");
+  return getExerciseByName(exerciseName);
 }
 
 async function fetchImageAsBase64(url: string): Promise<string | null> {
   try {
-    const response = await fetch(url)
-    if (!response.ok) return null
-    const blob = await response.blob()
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
     return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
   } catch {
-    return null
+    return null;
   }
 }
-
-
 
 export async function resolveExerciseReferenceContent(
   exerciseId: string,
   exerciseName: string,
 ): Promise<ExerciseReferenceContent | undefined> {
-  const normalizedName = normalizeExerciseName(exerciseName)
+  const normalizedName = normalizeExerciseName(exerciseName);
   if (!normalizedName) {
-    return undefined
+    return undefined;
   }
-  const normalizedExerciseId = exerciseId.trim()
+  const normalizedExerciseId = exerciseId.trim();
 
-  const uploaded = getUploadedExerciseImage(exerciseName)
+  const uploaded = getUploadedExerciseImage(exerciseName);
   if (uploaded) {
     return {
-      source: 'uploaded',
+      source: "uploaded",
       images: [uploaded],
       instructions: [],
-    }
+    };
   }
 
-  const cachedContent = exerciseReferenceContentCache.get(normalizedName)
+  const cachedContent = exerciseReferenceContentCache.get(normalizedName);
   if (cachedContent) {
-    return cachedContent
+    return cachedContent;
   }
 
   if (normalizedExerciseId && defaultExercisesData[normalizedExerciseId]) {
-    const data = defaultExercisesData[normalizedExerciseId]
-    const images = data.images || []
-    const instructions = (data.instructions || []).map((i: string) => i.trim()).filter((i: string) => i.length > 0)
+    const data = defaultExercisesData[normalizedExerciseId];
+    const images = data.images || [];
+    const instructions = (data.instructions || [])
+      .map((i: string) => i.trim())
+      .filter((i: string) => i.length > 0);
 
     if (images.length > 0) {
       const result: ExerciseReferenceContent = {
-        source: 'db',
+        source: "db",
         images,
         instructions,
-      }
+      };
 
-      exerciseReferenceContentCache.set(normalizedName, result)
-      return result
+      exerciseReferenceContentCache.set(normalizedName, result);
+      return result;
     }
   }
 
   // Use central exerciseDb module instead of direct DB access
-  const { getExerciseByName } = await import('./exerciseDb')
-  const matchedDbExercise = await getExerciseByName(exerciseName)
+  const { getExerciseByName } = await import("./exerciseDb");
+  const matchedDbExercise = await getExerciseByName(exerciseName);
   if (matchedDbExercise) {
     const images =
       matchedDbExercise.images
         ?.map((path) => path.trim())
         .filter((path) => path.length > 0)
-        .map(resolveExerciseImagePath) ?? []
+        .map(resolveExerciseImagePath) ?? [];
     const instructions =
       matchedDbExercise.instructions
         ?.map((instruction) => instruction.trim())
-        .filter((instruction) => instruction.length > 0) ?? []
+        .filter((instruction) => instruction.length > 0) ?? [];
 
     if (images.length > 0) {
       const result: ExerciseReferenceContent = {
-        source: 'db',
+        source: "db",
         images,
         instructions,
-      }
+      };
 
-      exerciseReferenceContentCache.set(normalizedName, result)
-      return result
+      exerciseReferenceContentCache.set(normalizedName, result);
+      return result;
     }
   }
 
@@ -281,24 +301,26 @@ export async function resolveExerciseReferenceContent(
     isCustomExerciseVariant(normalizedExerciseId, exerciseName) &&
     matchedDbExercise?.images?.length
   ) {
-    const firstImagePath = matchedDbExercise.images[0]
+    const firstImagePath = matchedDbExercise.images[0];
     if (firstImagePath) {
-      const base64 = await fetchImageAsBase64(buildFreeExerciseImageUrl(firstImagePath))
+      const base64 = await fetchImageAsBase64(
+        buildFreeExerciseImageUrl(firstImagePath),
+      );
       if (base64) {
         const instructions =
           matchedDbExercise.instructions
             ?.map((instruction) => instruction.trim())
-            .filter((instruction) => instruction.length > 0) ?? []
-        saveUploadedExerciseImage(exerciseName, base64)
+            .filter((instruction) => instruction.length > 0) ?? [];
+        saveUploadedExerciseImage(exerciseName, base64);
 
         const result: ExerciseReferenceContent = {
-          source: 'uploaded',
+          source: "uploaded",
           images: [base64],
           instructions,
-        }
+        };
 
-        exerciseReferenceContentCache.set(normalizedName, result)
-        return result
+        exerciseReferenceContentCache.set(normalizedName, result);
+        return result;
       }
     }
   }
@@ -306,30 +328,33 @@ export async function resolveExerciseReferenceContent(
   const fallbackExerciseId =
     normalizedExerciseId ||
     getCatalogExerciseIdByName(exerciseName) ||
-    LOCAL_FALLBACK_EXERCISE_ID
+    LOCAL_FALLBACK_EXERCISE_ID;
 
   const fallback: ExerciseReferenceContent = {
-    source: 'db', // default fallback assumes these are our static images
+    source: "db", // default fallback assumes these are our static images
     images: [`/images/exercises/${fallbackExerciseId}_0.webp`],
     instructions: [],
-  }
-  exerciseReferenceContentCache.set(normalizedName, fallback)
+  };
+  exerciseReferenceContentCache.set(normalizedName, fallback);
 
-  return fallback
+  return fallback;
 }
 
 export async function resolveExerciseReferenceImage(
   exerciseId: string,
   exerciseName: string,
 ): Promise<ExerciseReferenceImage | undefined> {
-  const content = await resolveExerciseReferenceContent(exerciseId, exerciseName)
-  const firstImage = content?.images[0]
+  const content = await resolveExerciseReferenceContent(
+    exerciseId,
+    exerciseName,
+  );
+  const firstImage = content?.images[0];
   if (!firstImage) {
-    return undefined
+    return undefined;
   }
 
   return {
     source: content.source,
     url: firstImage,
-  }
+  };
 }

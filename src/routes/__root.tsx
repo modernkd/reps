@@ -181,7 +181,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en" data-theme="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <meta httpEquiv="Content-Security-Policy" content={contentSecurityPolicy} />
+        <meta
+          httpEquiv="Content-Security-Policy"
+          content={contentSecurityPolicy}
+        />
         <meta name="referrer" content="strict-origin-when-cross-origin" />
         <meta
           httpEquiv="Permissions-Policy"

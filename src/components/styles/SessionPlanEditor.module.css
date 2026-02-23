@@ -58,9 +58,9 @@
   gap: 0.85rem;
   grid-template-columns: minmax(13rem, 1.5fr) minmax(11rem, 1fr);
   grid-template-areas:
-    'identity reference'
-    'metrics metrics'
-    'insights insights';
+    "identity reference"
+    "metrics metrics"
+    "insights insights";
   align-items: start;
   background: color-mix(in srgb, var(--surface-0) 86%, var(--surface-1));
   box-shadow: 0 2px 8px color-mix(in srgb, var(--ink-900) 10%, transparent);
@@ -205,10 +205,10 @@
   .exerciseRow {
     grid-template-columns: 1fr;
     grid-template-areas:
-      'identity'
-      'reference'
-      'metrics'
-      'insights';
+      "identity"
+      "reference"
+      "metrics"
+      "insights";
   }
 
   .metricGrid {

@@ -1,50 +1,50 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 
 import {
   resolveExerciseReferenceImage,
   type ExerciseReferenceImage,
-} from './exerciseImages'
+} from "./exerciseImages";
 
 type UseExerciseReferenceImageResult = {
-  image: ExerciseReferenceImage | undefined
-  isLoading: boolean
-}
+  image: ExerciseReferenceImage | undefined;
+  isLoading: boolean;
+};
 
 export function useExerciseReferenceImage(
   exerciseId: string,
   exerciseName: string,
   refreshKey = 0,
 ): UseExerciseReferenceImageResult {
-  const [image, setImage] = useState<ExerciseReferenceImage | undefined>()
-  const [isLoading, setIsLoading] = useState(false)
+  const [image, setImage] = useState<ExerciseReferenceImage | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const hasSearchTarget = exerciseName.trim().length > 0
+    const hasSearchTarget = exerciseName.trim().length > 0;
     if (!hasSearchTarget) {
-      setImage(undefined)
-      setIsLoading(false)
-      return
+      setImage(undefined);
+      setIsLoading(false);
+      return;
     }
 
-    let cancelled = false
-    setIsLoading(true)
+    let cancelled = false;
+    setIsLoading(true);
 
     resolveExerciseReferenceImage(exerciseId, exerciseName)
       .then((nextImage) => {
         if (!cancelled) {
-          setImage(nextImage)
+          setImage(nextImage);
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
-      })
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [exerciseId, exerciseName, refreshKey])
+      cancelled = true;
+    };
+  }, [exerciseId, exerciseName, refreshKey]);
 
-  return { image, isLoading }
+  return { image, isLoading };
 }

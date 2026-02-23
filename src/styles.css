@@ -37,7 +37,11 @@
   --surface-3: var(--color-slate-4);
   --ink-950: var(--color-slate-12);
   --ink-900: var(--color-slate-12);
-  --ink-800: color-mix(in oklab, var(--color-slate-12) 80%, var(--color-slate-11));
+  --ink-800: color-mix(
+    in oklab,
+    var(--color-slate-12) 80%,
+    var(--color-slate-11)
+  );
   --ink-700: var(--color-slate-11);
   --ink-600: var(--color-slate-10);
   --ink-500: var(--color-slate-9);

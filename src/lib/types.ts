@@ -1,7 +1,7 @@
-import { z } from 'zod'
+import { z } from "zod";
 
-export const intensitySchema = z.enum(['low', 'medium', 'high'])
-export type WorkoutIntensity = z.infer<typeof intensitySchema>
+export const intensitySchema = z.enum(["low", "medium", "high"]);
+export type WorkoutIntensity = z.infer<typeof intensitySchema>;
 
 export const setLogSchema = z.object({
   exerciseId: z.string(),
@@ -11,16 +11,16 @@ export const setLogSchema = z.object({
   actualReps: z.number().int().nonnegative().optional(),
   weightKg: z.number().nonnegative().optional(),
   restSecUsed: z.number().int().nonnegative(),
-})
-export type SetLog = z.infer<typeof setLogSchema>
+});
+export type SetLog = z.infer<typeof setLogSchema>;
 
 export const sessionSummarySchema = z.object({
   startedAt: z.string(),
   endedAt: z.string(),
   totalDurationMin: z.number().nonnegative(),
   setLogs: z.array(setLogSchema),
-})
-export type SessionSummary = z.infer<typeof sessionSummarySchema>
+});
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
 export const workoutSchema = z.object({
   id: z.string(),
@@ -35,15 +35,15 @@ export const workoutSchema = z.object({
   updatedAt: z.string(),
   scheduledSessionId: z.string().optional(),
   sessionSummary: sessionSummarySchema.optional(),
-})
-export type Workout = z.infer<typeof workoutSchema>
+});
+export type Workout = z.infer<typeof workoutSchema>;
 
 export const workoutTypeSchema = z.object({
   id: z.string(),
   name: z.string(),
   color: z.string(),
-})
-export type WorkoutType = z.infer<typeof workoutTypeSchema>
+});
+export type WorkoutType = z.infer<typeof workoutTypeSchema>;
 
 export const planTemplateSchema = z.object({
   id: z.string(),
@@ -54,16 +54,16 @@ export const planTemplateSchema = z.object({
   isStarter: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
-})
-export type PlanTemplate = z.infer<typeof planTemplateSchema>
+});
+export type PlanTemplate = z.infer<typeof planTemplateSchema>;
 
 export const planDaySchema = z.object({
   id: z.string(),
   templateId: z.string(),
   weekday: z.number().int().min(1).max(7),
   label: z.string(),
-})
-export type PlanDay = z.infer<typeof planDaySchema>
+});
+export type PlanDay = z.infer<typeof planDaySchema>;
 
 export const exerciseTemplateSchema = z.object({
   id: z.string(),
@@ -74,24 +74,26 @@ export const exerciseTemplateSchema = z.object({
   maxReps: z.number().int().positive().optional(),
   restSecDefault: z.number().int().positive().optional(),
   targetMassKg: z.number().positive().optional(),
-})
-export type ExerciseTemplate = z.infer<typeof exerciseTemplateSchema>
+});
+export type ExerciseTemplate = z.infer<typeof exerciseTemplateSchema>;
 
 export const exerciseCatalogEntrySchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   createdAt: z.string(),
   updatedAt: z.string(),
-})
-export type ExerciseCatalogEntry = z.infer<typeof exerciseCatalogEntrySchema>
+});
+export type ExerciseCatalogEntry = z.infer<typeof exerciseCatalogEntrySchema>;
 
 export const scheduledSessionStatusSchema = z.enum([
-  'planned',
-  'in_progress',
-  'completed',
-  'skipped',
-])
-export type ScheduledSessionStatus = z.infer<typeof scheduledSessionStatusSchema>
+  "planned",
+  "in_progress",
+  "completed",
+  "skipped",
+]);
+export type ScheduledSessionStatus = z.infer<
+  typeof scheduledSessionStatusSchema
+>;
 
 export const plannedWorkoutSchema = z.object({
   type: z.string(),
@@ -100,8 +102,8 @@ export const plannedWorkoutSchema = z.object({
   distanceKm: z.number().positive().optional(),
   intensity: intensitySchema.optional(),
   notes: z.string().max(1000).optional(),
-})
-export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>
+});
+export type PlannedWorkout = z.infer<typeof plannedWorkoutSchema>;
 
 export const scheduledSessionSchema = z.object({
   id: z.string(),
@@ -111,8 +113,8 @@ export const scheduledSessionSchema = z.object({
   status: scheduledSessionStatusSchema,
   workoutId: z.string().optional(),
   plannedWorkout: plannedWorkoutSchema.optional(),
-})
-export type ScheduledSession = z.infer<typeof scheduledSessionSchema>
+});
+export type ScheduledSession = z.infer<typeof scheduledSessionSchema>;
 
 export const activeSessionDraftSchema = z.object({
   sessionId: z.string(),
@@ -124,8 +126,8 @@ export const activeSessionDraftSchema = z.object({
   timerPaused: z.boolean(),
   timerRemainingSec: z.number().int().nonnegative().optional(),
   updatedAt: z.string(),
-})
-export type ActiveSessionDraft = z.infer<typeof activeSessionDraftSchema>
+});
+export type ActiveSessionDraft = z.infer<typeof activeSessionDraftSchema>;
 
 export const sessionExercisePlanSchema = z.object({
   id: z.string(),
@@ -135,8 +137,8 @@ export const sessionExercisePlanSchema = z.object({
   maxReps: z.number().int().positive().optional(),
   restSecDefault: z.number().int().positive().optional(),
   targetMassKg: z.number().positive().optional(),
-})
-export type SessionExercisePlan = z.infer<typeof sessionExercisePlanSchema>
+});
+export type SessionExercisePlan = z.infer<typeof sessionExercisePlanSchema>;
 
 export const sessionPlanSchema = z.object({
   id: z.string(),
@@ -145,28 +147,28 @@ export const sessionPlanSchema = z.object({
   notes: z.string().optional(),
   exercises: z.array(sessionExercisePlanSchema),
   updatedAt: z.string(),
-})
-export type SessionPlan = z.infer<typeof sessionPlanSchema>
+});
+export type SessionPlan = z.infer<typeof sessionPlanSchema>;
 
 export type CalendarDayModel = {
-  date: string
-  inCurrentMonth: boolean
-  workouts: Workout[]
-  sessions: ScheduledSession[]
-}
+  date: string;
+  inCurrentMonth: boolean;
+  workouts: Workout[];
+  sessions: ScheduledSession[];
+};
 
 export type WeeklyTrendPoint = {
-  weekStart: string
-  workoutsPerWeek: number
-  totalDurationPerWeek: number
-  avgWeightKg: number | null
-}
+  weekStart: string;
+  workoutsPerWeek: number;
+  totalDurationPerWeek: number;
+  avgWeightKg: number | null;
+};
 
 export type WeeklyTrendSeries = {
-  points: WeeklyTrendPoint[]
-}
+  points: WeeklyTrendPoint[];
+};
 
 export type ProgressPoint = {
-  date: string
-  value: number
-}
+  date: string;
+  value: number;
+};

@@ -1,18 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
-import { AppHeader } from './AppHeader'
+import { AppHeader } from "./AppHeader";
 
 function renderHeader(overrides?: {
-  templates?: Array<{ id: string; name: string }>
-  activeTemplateId?: string
-  greetingName?: string | null
-  isSignedIn?: boolean
+  templates?: Array<{ id: string; name: string }>;
+  activeTemplateId?: string;
+  greetingName?: string | null;
+  isSignedIn?: boolean;
 }) {
-  const templates = overrides?.templates ?? [{ id: 'template-1', name: 'Template 1' }]
+  const templates = overrides?.templates ?? [
+    { id: "template-1", name: "Template 1" },
+  ];
   const props = {
-    view: 'calendar' as const,
-    language: 'en' as const,
+    view: "calendar" as const,
+    language: "en" as const,
     greetingName: overrides?.greetingName ?? null,
     isSignedIn: overrides?.isSignedIn ?? false,
     templates,
@@ -25,108 +27,112 @@ function renderHeader(overrides?: {
     onOpenDuplicateTemplate: vi.fn(),
     onDeleteTemplate: vi.fn(),
     onOpenAuth: vi.fn(),
-  }
+  };
 
-  render(<AppHeader {...props} />)
-  return props
+  render(<AppHeader {...props} />);
+  return props;
 }
 
-describe('AppHeader', () => {
-  it('requests graph view when selecting Graphs', () => {
-    const props = renderHeader()
+describe("AppHeader", () => {
+  it("requests graph view when selecting Graphs", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Graphs' }))
+    fireEvent.click(screen.getByRole("tab", { name: "Graphs" }));
 
-    expect(props.onViewChange).toHaveBeenCalledWith('graph')
-  })
+    expect(props.onViewChange).toHaveBeenCalledWith("graph");
+  });
 
-  it('requests exercises view when selecting Exercises', () => {
-    const props = renderHeader()
+  it("requests exercises view when selecting Exercises", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Exercises' }))
+    fireEvent.click(screen.getByRole("tab", { name: "Exercises" }));
 
-    expect(props.onViewChange).toHaveBeenCalledWith('exercises')
-  })
+    expect(props.onViewChange).toHaveBeenCalledWith("exercises");
+  });
 
-  it('applies selected template to calendar from action button', () => {
-    const props = renderHeader()
+  it("applies selected template to calendar from action button", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add template to calendar' }))
+    fireEvent.click(
+      screen.getByRole("button", { name: "Add template to calendar" }),
+    );
 
-    expect(props.onApplyTemplateToCalendar).toHaveBeenCalledTimes(1)
-  })
+    expect(props.onApplyTemplateToCalendar).toHaveBeenCalledTimes(1);
+  });
 
-  it('opens create-template flow from template dropdown action', () => {
-    const props = renderHeader()
+  it("opens create-template flow from template dropdown action", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByRole('button', { name: 'New template' }))
+    fireEvent.click(screen.getByRole("button", { name: "New template" }));
 
-    expect(props.onOpenCreateTemplate).toHaveBeenCalledTimes(1)
-  })
+    expect(props.onOpenCreateTemplate).toHaveBeenCalledTimes(1);
+  });
 
-  it('opens duplicate-template flow from template dropdown action', () => {
-    const props = renderHeader()
+  it("opens duplicate-template flow from template dropdown action", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText('Manage Template 1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Duplicate template' }))
+    fireEvent.click(screen.getByLabelText("Manage Template 1"));
+    fireEvent.click(screen.getByRole("button", { name: "Duplicate template" }));
 
-    expect(props.onOpenDuplicateTemplate).toHaveBeenCalledWith('template-1')
-  })
+    expect(props.onOpenDuplicateTemplate).toHaveBeenCalledWith("template-1");
+  });
 
-  it('opens edit-template flow from template dropdown action', () => {
-    const props = renderHeader()
+  it("opens edit-template flow from template dropdown action", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText('Manage Template 1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Edit template' }))
+    fireEvent.click(screen.getByLabelText("Manage Template 1"));
+    fireEvent.click(screen.getByRole("button", { name: "Edit template" }));
 
-    expect(props.onOpenEditTemplate).toHaveBeenCalledWith('template-1')
-  })
+    expect(props.onOpenEditTemplate).toHaveBeenCalledWith("template-1");
+  });
 
-  it('requests delete from template action menu', () => {
-    const props = renderHeader()
+  it("requests delete from template action menu", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText('Manage Template 1'))
-    expect(screen.getByRole('button', { name: 'Delete template' })).toBeDisabled()
+    fireEvent.click(screen.getByLabelText("Manage Template 1"));
+    expect(
+      screen.getByRole("button", { name: "Delete template" }),
+    ).toBeDisabled();
 
-    expect(props.onDeleteTemplate).not.toHaveBeenCalled()
-  })
+    expect(props.onDeleteTemplate).not.toHaveBeenCalled();
+  });
 
-  it('requests delete when multiple templates are available', () => {
+  it("requests delete when multiple templates are available", () => {
     const props = renderHeader({
       templates: [
-        { id: 'template-1', name: 'Template 1' },
-        { id: 'template-2', name: 'Template 2' },
+        { id: "template-1", name: "Template 1" },
+        { id: "template-2", name: "Template 2" },
       ],
-    })
+    });
 
-    fireEvent.click(screen.getByLabelText('Manage Template 1'))
-    fireEvent.click(screen.getByRole('button', { name: 'Delete template' }))
+    fireEvent.click(screen.getByLabelText("Manage Template 1"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete template" }));
 
-    expect(props.onDeleteTemplate).toHaveBeenCalledWith('template-1')
-  })
+    expect(props.onDeleteTemplate).toHaveBeenCalledWith("template-1");
+  });
 
-  it('requests template change when selecting a template id', () => {
-    const props = renderHeader()
+  it("requests template change when selecting a template id", () => {
+    const props = renderHeader();
 
-    fireEvent.change(screen.getByLabelText('Select template'), {
-      target: { value: 'template-1' },
-    })
+    fireEvent.change(screen.getByLabelText("Select template"), {
+      target: { value: "template-1" },
+    });
 
-    expect(props.onTemplateChange).toHaveBeenCalledWith('template-1')
-  })
+    expect(props.onTemplateChange).toHaveBeenCalledWith("template-1");
+  });
 
-  it('opens auth page from Login button', () => {
-    const props = renderHeader()
+  it("opens auth page from Login button", () => {
+    const props = renderHeader();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    fireEvent.click(screen.getByRole("button", { name: "Login" }));
 
-    expect(props.onOpenAuth).toHaveBeenCalledTimes(1)
-  })
+    expect(props.onOpenAuth).toHaveBeenCalledTimes(1);
+  });
 
-  it('shows account label and greeting when signed in', () => {
-    renderHeader({ isSignedIn: true, greetingName: 'Jordan' })
+  it("shows account label and greeting when signed in", () => {
+    renderHeader({ isSignedIn: true, greetingName: "Jordan" });
 
-    expect(screen.getByText('Hi, Jordan!')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Account' })).toBeInTheDocument()
-  })
-})
+    expect(screen.getByText("Hi, Jordan!")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
+  });
+});

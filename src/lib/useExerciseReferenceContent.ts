@@ -1,50 +1,52 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react";
 
 import {
   resolveExerciseReferenceContent,
   type ExerciseReferenceContent,
-} from './exerciseImages'
+} from "./exerciseImages";
 
 type UseExerciseReferenceContentResult = {
-  content: ExerciseReferenceContent | undefined
-  isLoading: boolean
-}
+  content: ExerciseReferenceContent | undefined;
+  isLoading: boolean;
+};
 
 export function useExerciseReferenceContent(
   exerciseId: string,
   exerciseName: string,
   refreshKey = 0,
 ): UseExerciseReferenceContentResult {
-  const [content, setContent] = useState<ExerciseReferenceContent | undefined>()
-  const [isLoading, setIsLoading] = useState(false)
+  const [content, setContent] = useState<
+    ExerciseReferenceContent | undefined
+  >();
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const hasSearchTarget = exerciseName.trim().length > 0
+    const hasSearchTarget = exerciseName.trim().length > 0;
     if (!hasSearchTarget) {
-      setContent(undefined)
-      setIsLoading(false)
-      return
+      setContent(undefined);
+      setIsLoading(false);
+      return;
     }
 
-    let cancelled = false
-    setIsLoading(true)
+    let cancelled = false;
+    setIsLoading(true);
 
     resolveExerciseReferenceContent(exerciseId, exerciseName)
       .then((nextContent) => {
         if (!cancelled) {
-          setContent(nextContent)
+          setContent(nextContent);
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
-      })
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [exerciseId, exerciseName, refreshKey])
+      cancelled = true;
+    };
+  }, [exerciseId, exerciseName, refreshKey]);
 
-  return { content, isLoading }
+  return { content, isLoading };
 }

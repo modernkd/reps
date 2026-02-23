@@ -1,26 +1,27 @@
-import { differenceInSeconds, formatDistanceStrict, parseISO } from 'date-fns'
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { differenceInSeconds, formatDistanceStrict, parseISO } from "date-fns";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
-import { Modal } from '@/components/Modal'
-import { estimateWorkoutCaloriesBurned } from '@/lib/calories'
-import { nowIso } from '@/lib/date'
+import { Modal } from "@/components/Modal";
+import { ExerciseDetailImageCarousel } from "@/components/ExerciseDetailImageCarousel";
+import { estimateWorkoutCaloriesBurned } from "@/lib/calories";
+import { nowIso } from "@/lib/date";
 import {
   readFileAsDataUrl,
   saveUploadedExerciseImage,
-} from '@/lib/exerciseImages'
-import type { AppLanguage } from '@/lib/i18n'
-import { getCopy, getDateLocale } from '@/lib/i18n'
+} from "@/lib/exerciseImages";
+import type { AppLanguage } from "@/lib/i18n";
+import { getCopy, getDateLocale } from "@/lib/i18n";
 import {
   addGuidedRestIncrement,
   GUIDED_REST_DEFAULT_SEC,
   GUIDED_REST_INCREMENT_SEC,
-} from '@/lib/restTimer'
+} from "@/lib/restTimer";
 import {
   getCatalogExerciseVariants,
   isCustomExerciseVariant,
-} from '@/lib/variants'
-import { useExerciseReferenceContent } from '@/lib/useExerciseReferenceContent'
-import { inferWorkoutTypeFromPlanDay } from '@/lib/workoutType'
+} from "@/lib/variants";
+import { useExerciseReferenceContent } from "@/lib/useExerciseReferenceContent";
+import { inferWorkoutTypeFromPlanDay } from "@/lib/workoutType";
 import type {
   ActiveSessionDraft,
   ExerciseTemplate,
@@ -28,34 +29,42 @@ import type {
   ScheduledSession,
   SessionSummary,
   SetLog,
-} from '@/lib/types'
+} from "@/lib/types";
 
-import styles from './styles/GuidedWorkoutView.module.css'
+import styles from "./styles/GuidedWorkoutView.module.css";
 
 type GuidedWorkoutViewProps = {
-  language: AppLanguage
-  session: ScheduledSession
-  planDay: PlanDay | undefined
-  exercises: ExerciseTemplate[]
-  draft: ActiveSessionDraft
-  onSaveDraft: (updater: (draft: ActiveSessionDraft) => ActiveSessionDraft) => Promise<void>
-  onComplete: (summary: SessionSummary, notes?: string) => Promise<void>
-  onAbort: () => Promise<void>
-  onSwapExerciseVariant: (exerciseIndex: number, nextName: string) => Promise<void>
-  latestWeightByExerciseName: Record<string, number>
-}
+  language: AppLanguage;
+  session: ScheduledSession;
+  planDay: PlanDay | undefined;
+  exercises: ExerciseTemplate[];
+  draft: ActiveSessionDraft;
+  onSaveDraft: (
+    updater: (draft: ActiveSessionDraft) => ActiveSessionDraft,
+  ) => Promise<void>;
+  onComplete: (summary: SessionSummary, notes?: string) => Promise<void>;
+  onAbort: () => Promise<void>;
+  onSwapExerciseVariant: (
+    exerciseIndex: number,
+    nextName: string,
+  ) => Promise<void>;
+  latestWeightByExerciseName: Record<string, number>;
+};
 
 function normalizeExerciseName(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function getRemainingSeconds(restEndAt?: string, explicitRemaining?: number): number {
+function getRemainingSeconds(
+  restEndAt?: string,
+  explicitRemaining?: number,
+): number {
   if (!restEndAt) {
-    return explicitRemaining ?? GUIDED_REST_DEFAULT_SEC
+    return explicitRemaining ?? GUIDED_REST_DEFAULT_SEC;
   }
 
-  const delta = differenceInSeconds(parseISO(restEndAt), new Date())
-  return Math.max(0, delta)
+  const delta = differenceInSeconds(parseISO(restEndAt), new Date());
+  return Math.max(0, delta);
 }
 
 function nextSetPosition(
@@ -63,32 +72,44 @@ function nextSetPosition(
   currentSetIndex: number,
   exercises: ExerciseTemplate[],
 ): { exerciseIndex: number; setIndex: number; finished: boolean } {
-  const exercise = exercises[currentExerciseIndex]
+  const exercise = exercises[currentExerciseIndex];
   if (!exercise) {
-    return { exerciseIndex: currentExerciseIndex, setIndex: currentSetIndex, finished: true }
+    return {
+      exerciseIndex: currentExerciseIndex,
+      setIndex: currentSetIndex,
+      finished: true,
+    };
   }
 
-  const nextSet = currentSetIndex + 1
+  const nextSet = currentSetIndex + 1;
   if (nextSet < exercise.sets) {
-    return { exerciseIndex: currentExerciseIndex, setIndex: nextSet, finished: false }
+    return {
+      exerciseIndex: currentExerciseIndex,
+      setIndex: nextSet,
+      finished: false,
+    };
   }
 
-  const nextExercise = currentExerciseIndex + 1
+  const nextExercise = currentExerciseIndex + 1;
   if (nextExercise < exercises.length) {
-    return { exerciseIndex: nextExercise, setIndex: 0, finished: false }
+    return { exerciseIndex: nextExercise, setIndex: 0, finished: false };
   }
 
-  return { exerciseIndex: currentExerciseIndex, setIndex: currentSetIndex, finished: true }
+  return {
+    exerciseIndex: currentExerciseIndex,
+    setIndex: currentSetIndex,
+    finished: true,
+  };
 }
 
 function variantSuggestionListId(exerciseId: string): string {
-  return `guided_variant_${exerciseId}`
+  return `guided_variant_${exerciseId}`;
 }
 
 type CompletionPreview = {
-  summary: SessionSummary
-  estimatedCalories: number
-}
+  summary: SessionSummary;
+  estimatedCalories: number;
+};
 
 export function GuidedWorkoutView({
   language,
@@ -102,149 +123,146 @@ export function GuidedWorkoutView({
   onSwapExerciseVariant,
   latestWeightByExerciseName,
 }: GuidedWorkoutViewProps) {
-  const copy = getCopy(language)
-  const dateLocale = getDateLocale(language)
+  const copy = getCopy(language);
+  const dateLocale = getDateLocale(language);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(
     draft.currentExerciseIndex,
-  )
-  const [currentSetIndex, setCurrentSetIndex] = useState(draft.currentSetIndex)
-  const [setLogs, setSetLogs] = useState<SetLog[]>(draft.setLogs)
+  );
+  const [currentSetIndex, setCurrentSetIndex] = useState(draft.currentSetIndex);
+  const [setLogs, setSetLogs] = useState<SetLog[]>(draft.setLogs);
   const [restSecLeft, setRestSecLeft] = useState(
     getRemainingSeconds(draft.restEndAt, draft.timerRemainingSec),
-  )
-  const [timerPaused, setTimerPaused] = useState(draft.timerPaused)
-  const [reps, setReps] = useState(8)
-  const [weightKg, setWeightKg] = useState(0)
-  const [notes, setNotes] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [variantInput, setVariantInput] = useState('')
-  const [imageRefreshKey, setImageRefreshKey] = useState(0)
-  const [referenceImageIndex, setReferenceImageIndex] = useState(0)
-  const [completionPreview, setCompletionPreview] = useState<CompletionPreview | null>(
-    null,
-  )
+  );
+  const [timerPaused, setTimerPaused] = useState(draft.timerPaused);
+  const [reps, setReps] = useState(8);
+  const [weightKg, setWeightKg] = useState(0);
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [variantInput, setVariantInput] = useState("");
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
+  const [completionPreview, setCompletionPreview] =
+    useState<CompletionPreview | null>(null);
 
-  const currentExercise = exercises[currentExerciseIndex]
+  const currentExercise = exercises[currentExerciseIndex];
   const currentVariantOptions = currentExercise
     ? getCatalogExerciseVariants(currentExercise.id)
-    : []
-  const typedVariant = variantInput.trim()
+    : [];
+  const typedVariant = variantInput.trim();
   const customExercise = currentExercise
     ? isCustomExerciseVariant(currentExercise.id, typedVariant)
-    : false
-  const referenceExerciseName = typedVariant || currentExercise?.name || ''
+    : false;
+  const referenceExerciseName = typedVariant || currentExercise?.name || "";
   const { content: referenceContent, isLoading: isReferenceImageLoading } =
     useExerciseReferenceContent(
-      currentExercise?.id ?? '',
+      currentExercise?.id ?? "",
       referenceExerciseName,
       imageRefreshKey,
-    )
-  const referenceImages = referenceContent?.images ?? []
-  const referenceInstructions = referenceContent?.instructions ?? []
-  const hasReferenceImages = referenceImages.length > 0
-  const activeReferenceImage = hasReferenceImages
-    ? referenceImages[referenceImageIndex % referenceImages.length]
-    : undefined
-  const canCycleReferenceImages = referenceImages.length > 1
+    );
+  const referenceImages = referenceContent?.images ?? [];
+  const referenceInstructions = referenceContent?.instructions ?? [];
+  const hasReferenceImages = referenceImages.length > 0;
 
-  const totalSetsTarget = exercises.reduce((acc, exercise) => acc + exercise.sets, 0)
-  const completedSets = setLogs.length
+  const totalSetsTarget = exercises.reduce(
+    (acc, exercise) => acc + exercise.sets,
+    0,
+  );
+  const completedSets = setLogs.length;
   const isWorkoutSetsComplete =
-    totalSetsTarget > 0 && completedSets >= totalSetsTarget
+    totalSetsTarget > 0 && completedSets >= totalSetsTarget;
 
   useEffect(() => {
     if (!draft.restEndAt) {
-      return
+      return;
     }
 
-    setRestSecLeft(getRemainingSeconds(draft.restEndAt, draft.timerRemainingSec))
-  }, [draft.restEndAt, draft.timerRemainingSec])
+    setRestSecLeft(
+      getRemainingSeconds(draft.restEndAt, draft.timerRemainingSec),
+    );
+  }, [draft.restEndAt, draft.timerRemainingSec]);
 
   useEffect(() => {
     if (!currentExercise) {
-      setVariantInput('')
-      return
+      setVariantInput("");
+      return;
     }
 
-    setVariantInput(currentExercise.name)
-  }, [currentExercise?.id, currentExercise?.name])
-
-  useEffect(() => {
-    setReferenceImageIndex(0)
-  }, [currentExercise?.id, referenceExerciseName, imageRefreshKey])
+    setVariantInput(currentExercise.name);
+  }, [currentExercise?.id, currentExercise?.name]);
 
   useEffect(() => {
     if (!currentExercise) {
-      setWeightKg(0)
-      return
+      setWeightKg(0);
+      return;
     }
 
-    const normalized = normalizeExerciseName(currentExercise.name)
-    const nextWeight = latestWeightByExerciseName[normalized]
-    if (typeof nextWeight === 'number') {
-      setWeightKg(nextWeight)
-      return
+    const normalized = normalizeExerciseName(currentExercise.name);
+    const nextWeight = latestWeightByExerciseName[normalized];
+    if (typeof nextWeight === "number") {
+      setWeightKg(nextWeight);
+      return;
     }
 
-    setWeightKg(currentExercise.targetMassKg ?? 0)
+    setWeightKg(currentExercise.targetMassKg ?? 0);
   }, [
     currentExercise?.id,
     currentExercise?.name,
     currentExercise?.targetMassKg,
     latestWeightByExerciseName,
-  ])
+  ]);
 
   useEffect(() => {
     if (timerPaused || restSecLeft <= 0) {
-      return
+      return;
     }
 
     const timer = window.setInterval(() => {
-      setRestSecLeft((current) => Math.max(0, current - 1))
-    }, 1000)
+      setRestSecLeft((current) => Math.max(0, current - 1));
+    }, 1000);
 
-    return () => window.clearInterval(timer)
-  }, [timerPaused, restSecLeft])
+    return () => window.clearInterval(timer);
+  }, [timerPaused, restSecLeft]);
 
   const progressText = useMemo(() => {
     if (completedSets === 0) {
-      return copy.guided.startFirstSet
+      return copy.guided.startFirstSet;
     }
 
     if (isWorkoutSetsComplete) {
-      return copy.guided.startCoolDown
+      return copy.guided.startCoolDown;
     }
 
-    return copy.guided.setsLogged(completedSets, totalSetsTarget)
-  }, [completedSets, copy.guided, isWorkoutSetsComplete, totalSetsTarget])
+    return copy.guided.setsLogged(completedSets, totalSetsTarget);
+  }, [completedSets, copy.guided, isWorkoutSetsComplete, totalSetsTarget]);
 
-  const visibleExercise = isWorkoutSetsComplete ? undefined : currentExercise
+  const visibleExercise = isWorkoutSetsComplete ? undefined : currentExercise;
   const setCounterText = visibleExercise
     ? `${copy.guided.set} ${currentSetIndex + 1} ${copy.guided.of} ${visibleExercise.sets}`
-    : ''
-  const exerciseTargetTextParts: string[] = []
+    : "";
+  const exerciseTargetTextParts: string[] = [];
 
   if (visibleExercise?.minReps || visibleExercise?.maxReps) {
     exerciseTargetTextParts.push(
       `${copy.guided.target} ${visibleExercise.minReps ?? visibleExercise.maxReps}-${visibleExercise.maxReps ?? visibleExercise.minReps} ${copy.guided.reps}`,
-    )
+    );
   }
 
   if (visibleExercise?.targetMassKg) {
-    exerciseTargetTextParts.push(`${copy.guided.target} ${visibleExercise.targetMassKg} kg`)
+    exerciseTargetTextParts.push(
+      `${copy.guided.target} ${visibleExercise.targetMassKg} kg`,
+    );
   }
 
   const persist = async (next: {
-    exerciseIndex: number
-    setIndex: number
-    nextSetLogs: SetLog[]
-    nextRestSec: number
-    nextTimerPaused: boolean
+    exerciseIndex: number;
+    setIndex: number;
+    nextSetLogs: SetLog[];
+    nextRestSec: number;
+    nextTimerPaused: boolean;
   }) => {
     const restEndAt =
       next.nextRestSec > 0 && !next.nextTimerPaused
         ? new Date(Date.now() + next.nextRestSec * 1000).toISOString()
-        : undefined
+        : undefined;
 
     await onSaveDraft((prev) => ({
       ...prev,
@@ -255,63 +273,67 @@ export function GuidedWorkoutView({
       timerRemainingSec: next.nextRestSec,
       restEndAt,
       updatedAt: nowIso(),
-    }))
-  }
+    }));
+  };
 
   const commitVariantInput = async (): Promise<string | undefined> => {
     if (!currentExercise) {
-      return undefined
+      return undefined;
     }
 
-    const nextName = variantInput.trim()
+    const nextName = variantInput.trim();
     if (!nextName) {
-      setVariantInput(currentExercise.name)
-      return currentExercise.name
+      setVariantInput(currentExercise.name);
+      return currentExercise.name;
     }
 
     if (nextName === currentExercise.name) {
-      return currentExercise.name
+      return currentExercise.name;
     }
 
     try {
-      await onSwapExerciseVariant(currentExerciseIndex, nextName)
-      return nextName
+      await onSwapExerciseVariant(currentExerciseIndex, nextName);
+      return nextName;
     } catch {
-      setVariantInput(currentExercise.name)
-      return currentExercise.name
+      setVariantInput(currentExercise.name);
+      return currentExercise.name;
     }
-  }
+  };
 
-  const handleUploadCustomImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    event.currentTarget.value = ''
+  const handleUploadCustomImage = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
 
     if (!file) {
-      return
+      return;
     }
 
-    const resolvedName = await commitVariantInput()
+    const resolvedName = await commitVariantInput();
     if (!resolvedName?.trim()) {
-      return
+      return;
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file)
-      saveUploadedExerciseImage(resolvedName, dataUrl)
-      setImageRefreshKey((value) => value + 1)
+      const dataUrl = await readFileAsDataUrl(file);
+      saveUploadedExerciseImage(resolvedName, dataUrl);
+      setImageRefreshKey((value) => value + 1);
     } catch {
       // Keep guided flow active even if upload cannot be processed.
     }
-  }
+  };
 
   const handleCompleteSet = async () => {
     if (!currentExercise || isWorkoutSetsComplete) {
-      return
+      return;
     }
 
-    const committedName = await commitVariantInput()
-    const exerciseName = committedName?.trim() ? committedName : currentExercise.name
-    const targetReps = currentExercise.maxReps ?? currentExercise.minReps
+    const committedName = await commitVariantInput();
+    const exerciseName = committedName?.trim()
+      ? committedName
+      : currentExercise.name;
+    const targetReps = currentExercise.maxReps ?? currentExercise.minReps;
     const nextLog: SetLog = {
       exerciseId: currentExercise.id,
       exerciseName,
@@ -320,23 +342,23 @@ export function GuidedWorkoutView({
       actualReps: Math.max(0, reps),
       weightKg: weightKg > 0 ? weightKg : undefined,
       restSecUsed: GUIDED_REST_DEFAULT_SEC,
-    }
+    };
 
-    const nextSetLogs = [...setLogs, nextLog]
+    const nextSetLogs = [...setLogs, nextLog];
     const nextPosition = nextSetPosition(
       currentExerciseIndex,
       currentSetIndex,
       exercises,
-    )
-    const nextRestSec = GUIDED_REST_DEFAULT_SEC
+    );
+    const nextRestSec = GUIDED_REST_DEFAULT_SEC;
 
-    setSetLogs(nextSetLogs)
-    setRestSecLeft(nextRestSec)
-    setTimerPaused(false)
+    setSetLogs(nextSetLogs);
+    setRestSecLeft(nextRestSec);
+    setTimerPaused(false);
 
     if (!nextPosition.finished) {
-      setCurrentExerciseIndex(nextPosition.exerciseIndex)
-      setCurrentSetIndex(nextPosition.setIndex)
+      setCurrentExerciseIndex(nextPosition.exerciseIndex);
+      setCurrentSetIndex(nextPosition.setIndex);
     }
 
     await persist({
@@ -345,12 +367,12 @@ export function GuidedWorkoutView({
       nextSetLogs,
       nextRestSec,
       nextTimerPaused: false,
-    })
-  }
+    });
+  };
 
   const updateTimer = async (nextSec: number, paused: boolean) => {
-    setRestSecLeft(nextSec)
-    setTimerPaused(paused)
+    setRestSecLeft(nextSec);
+    setTimerPaused(paused);
 
     await persist({
       exerciseIndex: currentExerciseIndex,
@@ -358,52 +380,52 @@ export function GuidedWorkoutView({
       nextSetLogs: setLogs,
       nextRestSec: nextSec,
       nextTimerPaused: paused,
-    })
-  }
+    });
+  };
 
   const buildCompletionPreview = (): CompletionPreview => {
-    const endedAt = nowIso()
+    const endedAt = nowIso();
     const minutes = Math.max(
       1,
       Math.round(
         differenceInSeconds(parseISO(endedAt), parseISO(draft.startedAt)) / 60,
       ),
-    )
+    );
     const summary: SessionSummary = {
       startedAt: draft.startedAt,
       endedAt,
       totalDurationMin: minutes,
       setLogs,
-    }
+    };
 
     const estimatedCalories = estimateWorkoutCaloriesBurned({
       durationMin: summary.totalDurationMin,
       type: inferWorkoutTypeFromPlanDay(planDay),
       sessionSummary: summary,
-    })
+    });
 
     return {
       summary,
       estimatedCalories,
-    }
-  }
+    };
+  };
 
   const handleFinish = () => {
-    setCompletionPreview(buildCompletionPreview())
-  }
+    setCompletionPreview(buildCompletionPreview());
+  };
 
   const handleConfirmFinish = async () => {
     if (!completionPreview) {
-      return
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      await onComplete(completionPreview.summary, notes || undefined)
+      await onComplete(completionPreview.summary, notes || undefined);
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <section className={styles.wrapper} aria-label={copy.guided.sectionAria}>
@@ -419,7 +441,9 @@ export function GuidedWorkoutView({
 
       <article className={styles.card}>
         <h3>{visibleExercise?.name ?? copy.guided.allExercisesComplete}</h3>
-        {exerciseTargetTextParts.length > 0 ? <p>{exerciseTargetTextParts.join(' · ')}</p> : null}
+        {exerciseTargetTextParts.length > 0 ? (
+          <p>{exerciseTargetTextParts.join(" · ")}</p>
+        ) : null}
 
         {visibleExercise ? (
           <label className={styles.variantControl}>
@@ -430,12 +454,12 @@ export function GuidedWorkoutView({
               placeholder={copy.guided.exerciseVariantPlaceholder}
               onChange={(event) => setVariantInput(event.target.value)}
               onBlur={() => {
-                void commitVariantInput()
+                void commitVariantInput();
               }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  void commitVariantInput()
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void commitVariantInput();
                 }
               }}
             />
@@ -450,40 +474,18 @@ export function GuidedWorkoutView({
         {visibleExercise ? (
           <section className={styles.referenceCard}>
             <div className={styles.referenceMediaFrame}>
-              {activeReferenceImage ? (
-                <>
-                  <button
-                    type="button"
-                    className={styles.referenceImageButton}
-                    onClick={() => {
-                      if (!canCycleReferenceImages) {
-                        return
-                      }
-
-                      setReferenceImageIndex((current) => (current + 1) % referenceImages.length)
-                    }}
-                    aria-label={
-                      canCycleReferenceImages
-                        ? copy.guided.cycleReferenceImage(
-                            referenceImageIndex + 1,
-                            referenceImages.length,
-                          )
-                        : copy.guided.referenceImageAlt(referenceExerciseName)
-                    }
-                  >
-                    <img
-                      src={activeReferenceImage}
-                      alt={copy.guided.referenceImageAlt(referenceExerciseName)}
-                      loading="lazy"
-                      className={styles.referenceImage}
-                    />
-                  </button>
-                  {canCycleReferenceImages ? (
-                    <span className={styles.referenceImageStep}>
-                      {referenceImageIndex + 1}/{referenceImages.length}
-                    </span>
-                  ) : null}
-                </>
+              {hasReferenceImages ? (
+                <ExerciseDetailImageCarousel
+                  exerciseName={referenceExerciseName || visibleExercise.name}
+                  imageAlt={copy.guided.referenceImageAlt(
+                    referenceExerciseName || visibleExercise.name,
+                  )}
+                  images={referenceImages}
+                  imageObjectFit="contain"
+                  imageAspectRatio="4 / 3"
+                  autoplayIntervalMs={2000}
+                  manualPauseDurationMs={20000}
+                />
               ) : (
                 <p className={styles.referenceHint}>
                   {isReferenceImageLoading
@@ -493,18 +495,14 @@ export function GuidedWorkoutView({
               )}
             </div>
 
-            {canCycleReferenceImages ? (
-              <p className={styles.referenceHint}>
-                {copy.guided.cycleReferenceImage(referenceImageIndex + 1, referenceImages.length)}
-              </p>
-            ) : null}
-
             {referenceInstructions.length > 0 ? (
               <section className={styles.referenceInstructions}>
                 <h4>{copy.guided.instructionsTitle}</h4>
                 <ol>
                   {referenceInstructions.map((instruction, index) => (
-                    <li key={`${referenceExerciseName}-${index}`}>{instruction}</li>
+                    <li key={`${referenceExerciseName}-${index}`}>
+                      {instruction}
+                    </li>
                   ))}
                 </ol>
               </section>
@@ -512,7 +510,9 @@ export function GuidedWorkoutView({
 
             {customExercise ? (
               <>
-                <p className={styles.referenceHint}>{copy.guided.customExerciseHint}</p>
+                <p className={styles.referenceHint}>
+                  {copy.guided.customExerciseHint}
+                </p>
                 <label className={styles.uploadButton}>
                   {copy.guided.uploadCustomImage}
                   <input
@@ -529,7 +529,10 @@ export function GuidedWorkoutView({
         {visibleExercise ? (
           <>
             <div className={styles.repControls}>
-              <button type="button" onClick={() => setReps((value) => Math.max(0, value - 1))}>
+              <button
+                type="button"
+                onClick={() => setReps((value) => Math.max(0, value - 1))}
+              >
                 -
               </button>
               <input
@@ -538,7 +541,10 @@ export function GuidedWorkoutView({
                 value={reps}
                 onChange={(event) => setReps(Number(event.target.value) || 0)}
               />
-              <button type="button" onClick={() => setReps((value) => value + 1)}>
+              <button
+                type="button"
+                onClick={() => setReps((value) => value + 1)}
+              >
                 +
               </button>
               <span>{copy.guided.reps}</span>
@@ -551,14 +557,18 @@ export function GuidedWorkoutView({
                 min={0}
                 step={0.5}
                 value={weightKg}
-                onChange={(event) => setWeightKg(Number(event.target.value) || 0)}
+                onChange={(event) =>
+                  setWeightKg(Number(event.target.value) || 0)
+                }
               />
             </label>
           </>
         ) : null}
 
         <div className={styles.setActionRow}>
-          {setCounterText ? <p className={styles.setCounter}>{setCounterText}</p> : null}
+          {setCounterText ? (
+            <p className={styles.setCounter}>{setCounterText}</p>
+          ) : null}
           <button
             type="button"
             className={styles.completeSet}
@@ -576,7 +586,7 @@ export function GuidedWorkoutView({
         <h3>{copy.guided.restTimer}</h3>
         <p className={styles.timerValue}>
           {formatDistanceStrict(0, restSecLeft * 1000, {
-            unit: 'second',
+            unit: "second",
             locale: dateLocale,
           })}
         </p>
@@ -588,7 +598,12 @@ export function GuidedWorkoutView({
           >
             {timerPaused ? copy.guided.resume : copy.guided.pause}
           </button>
-          <button type="button" onClick={() => updateTimer(addGuidedRestIncrement(restSecLeft), false)}>
+          <button
+            type="button"
+            onClick={() =>
+              updateTimer(addGuidedRestIncrement(restSecLeft), false)
+            }
+          >
             +{GUIDED_REST_INCREMENT_SEC}s
           </button>
           <button type="button" onClick={() => updateTimer(0, true)}>
@@ -623,10 +638,10 @@ export function GuidedWorkoutView({
         isOpen={completionPreview !== null}
         onClose={() => {
           if (isSubmitting) {
-            return
+            return;
           }
 
-          setCompletionPreview(null)
+          setCompletionPreview(null);
         }}
         closeLabel={copy.common.close}
       >
@@ -652,7 +667,11 @@ export function GuidedWorkoutView({
               </div>
               <div className={styles.summaryRow}>
                 <dt>{copy.guided.summaryCalories}</dt>
-                <dd>{copy.details.estimatedCalories(completionPreview.estimatedCalories)}</dd>
+                <dd>
+                  {copy.details.estimatedCalories(
+                    completionPreview.estimatedCalories,
+                  )}
+                </dd>
               </div>
             </dl>
             <div className={styles.summaryActions}>
@@ -677,5 +696,5 @@ export function GuidedWorkoutView({
         ) : null}
       </Modal>
     </section>
-  )
+  );
 }

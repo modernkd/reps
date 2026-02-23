@@ -356,9 +356,9 @@ export function ExerciseHistoryView({
 
   const hasActiveFilters = Boolean(
     selectedFilters.muscle ||
-      selectedFilters.equipment ||
-      selectedFilters.difficulty ||
-      selectedFilters.category,
+    selectedFilters.equipment ||
+    selectedFilters.difficulty ||
+    selectedFilters.category,
   );
 
   const filteredEntries = useMemo(() => {
@@ -390,15 +390,24 @@ export function ExerciseHistoryView({
         }
       }
 
-      if (selectedEquipment && normalizeValue(metadata.equipment) !== selectedEquipment) {
+      if (
+        selectedEquipment &&
+        normalizeValue(metadata.equipment) !== selectedEquipment
+      ) {
         return false;
       }
 
-      if (selectedDifficulty && normalizeValue(metadata.level) !== selectedDifficulty) {
+      if (
+        selectedDifficulty &&
+        normalizeValue(metadata.level) !== selectedDifficulty
+      ) {
         return false;
       }
 
-      if (selectedCategory && normalizeValue(metadata.category) !== selectedCategory) {
+      if (
+        selectedCategory &&
+        normalizeValue(metadata.category) !== selectedCategory
+      ) {
         return false;
       }
 
@@ -564,7 +573,9 @@ export function ExerciseHistoryView({
         </header>
         {renderAddExerciseForm()}
         {renderExerciseFilters()}
-        <div className={styles.emptyState}>{copy.historyView.noFilteredResults}</div>
+        <div className={styles.emptyState}>
+          {copy.historyView.noFilteredResults}
+        </div>
       </section>
     );
   }

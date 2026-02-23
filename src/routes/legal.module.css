@@ -5,7 +5,11 @@
   display: grid;
   place-items: start center;
   background:
-    radial-gradient(1000px 620px at 10% -12%, color-mix(in srgb, var(--accent-500) 18%, transparent), transparent),
+    radial-gradient(
+      1000px 620px at 10% -12%,
+      color-mix(in srgb, var(--accent-500) 18%, transparent),
+      transparent
+    ),
     var(--surface-1);
 }
 

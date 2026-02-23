@@ -1,37 +1,37 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from "react";
 
-import type { AppLanguage } from '@/lib/i18n'
-import { getCopy, localizeWorkoutTypeName } from '@/lib/i18n'
-import type { Workout, WorkoutIntensity, WorkoutType } from '@/lib/types'
+import type { AppLanguage } from "@/lib/i18n";
+import { getCopy, localizeWorkoutTypeName } from "@/lib/i18n";
+import type { Workout, WorkoutIntensity, WorkoutType } from "@/lib/types";
 
-import ElasticSlider from './ElasticSlider'
-import styles from './styles/WorkoutForm.module.css'
+import ElasticSlider from "./ElasticSlider";
+import styles from "./styles/WorkoutForm.module.css";
 
 export type WorkoutFormValue = {
-  date: string
-  type: string
-  durationMin: number
-  targetWeightKg?: number
-  distanceKm?: number
-  intensity?: WorkoutIntensity
-  notes?: string
-}
+  date: string;
+  type: string;
+  durationMin: number;
+  targetWeightKg?: number;
+  distanceKm?: number;
+  intensity?: WorkoutIntensity;
+  notes?: string;
+};
 
 type WorkoutFormProps = {
-  language: AppLanguage
-  initialValue?: Workout
-  defaultDate: string
-  types: WorkoutType[]
-  onSubmit: (value: WorkoutFormValue) => Promise<void> | void
-  onCancel: () => void
-}
+  language: AppLanguage;
+  initialValue?: Workout;
+  defaultDate: string;
+  types: WorkoutType[];
+  onSubmit: (value: WorkoutFormValue) => Promise<void> | void;
+  onCancel: () => void;
+};
 
 type FieldErrors = {
-  durationMin?: string
-  targetWeightKg?: string
-  distanceKm?: string
-  type?: string
-}
+  durationMin?: string;
+  targetWeightKg?: string;
+  distanceKm?: string;
+  type?: string;
+};
 
 export function WorkoutForm({
   language,
@@ -41,65 +41,72 @@ export function WorkoutForm({
   onSubmit,
   onCancel,
 }: WorkoutFormProps) {
-  const copy = getCopy(language)
-  const defaultType = useMemo(() => types[0]?.id ?? 'lift', [types])
+  const copy = getCopy(language);
+  const defaultType = useMemo(() => types[0]?.id ?? "lift", [types]);
 
-  const [date, setDate] = useState(initialValue?.date ?? defaultDate)
-  const [type, setType] = useState(initialValue?.type ?? defaultType)
-  const [durationMin, setDurationMin] = useState(initialValue?.durationMin ?? 45)
+  const [date, setDate] = useState(initialValue?.date ?? defaultDate);
+  const [type, setType] = useState(initialValue?.type ?? defaultType);
+  const [durationMin, setDurationMin] = useState(
+    initialValue?.durationMin ?? 45,
+  );
   const [targetWeightKg, setTargetWeightKg] = useState(
-    initialValue?.targetWeightKg ? String(initialValue.targetWeightKg) : '',
-  )
+    initialValue?.targetWeightKg ? String(initialValue.targetWeightKg) : "",
+  );
   const [distanceKm, setDistanceKm] = useState(
-    initialValue?.distanceKm ? String(initialValue.distanceKm) : '',
-  )
-  const [intensity, setIntensity] = useState<WorkoutIntensity | ''>(
-    initialValue?.intensity ?? '',
-  )
-  const [notes, setNotes] = useState(initialValue?.notes ?? '')
-  const [errors, setErrors] = useState<FieldErrors>({})
-  const [isSaving, setIsSaving] = useState(false)
+    initialValue?.distanceKm ? String(initialValue.distanceKm) : "",
+  );
+  const [intensity, setIntensity] = useState<WorkoutIntensity | "">(
+    initialValue?.intensity ?? "",
+  );
+  const [notes, setNotes] = useState(initialValue?.notes ?? "");
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!type && defaultType) {
-      setType(defaultType)
+      setType(defaultType);
     }
-  }, [type, defaultType])
+  }, [type, defaultType]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+    event.preventDefault();
 
-    const nextErrors: FieldErrors = {}
-    const parsedDuration = Number(durationMin)
-    const parsedTargetWeight = targetWeightKg ? Number(targetWeightKg) : undefined
-    const parsedDistance = distanceKm ? Number(distanceKm) : undefined
+    const nextErrors: FieldErrors = {};
+    const parsedDuration = Number(durationMin);
+    const parsedTargetWeight = targetWeightKg
+      ? Number(targetWeightKg)
+      : undefined;
+    const parsedDistance = distanceKm ? Number(distanceKm) : undefined;
 
     if (!type) {
-      nextErrors.type = copy.form.selectTypeError
+      nextErrors.type = copy.form.selectTypeError;
     }
 
     if (!Number.isFinite(parsedDuration) || parsedDuration <= 0) {
-      nextErrors.durationMin = copy.form.durationError
+      nextErrors.durationMin = copy.form.durationError;
     }
 
     if (
       parsedTargetWeight !== undefined &&
       (!Number.isFinite(parsedTargetWeight) || parsedTargetWeight <= 0)
     ) {
-      nextErrors.targetWeightKg = copy.form.targetWeightError
+      nextErrors.targetWeightKg = copy.form.targetWeightError;
     }
 
-    if (parsedDistance !== undefined && (!Number.isFinite(parsedDistance) || parsedDistance <= 0)) {
-      nextErrors.distanceKm = copy.form.distanceError
+    if (
+      parsedDistance !== undefined &&
+      (!Number.isFinite(parsedDistance) || parsedDistance <= 0)
+    ) {
+      nextErrors.distanceKm = copy.form.distanceError;
     }
 
     if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors)
-      return
+      setErrors(nextErrors);
+      return;
     }
 
-    setErrors({})
-    setIsSaving(true)
+    setErrors({});
+    setIsSaving(true);
 
     try {
       await onSubmit({
@@ -110,11 +117,11 @@ export function WorkoutForm({
         distanceKm: parsedDistance,
         intensity: intensity || undefined,
         notes: notes.trim() || undefined,
-      })
+      });
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }
+  };
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
@@ -138,7 +145,9 @@ export function WorkoutForm({
             </option>
           ))}
         </select>
-        {errors.type ? <span className={styles.error}>{errors.type}</span> : null}
+        {errors.type ? (
+          <span className={styles.error}>{errors.type}</span>
+        ) : null}
       </label>
 
       <label>
@@ -157,12 +166,7 @@ export function WorkoutForm({
             rightIcon={<span aria-hidden>300</span>}
           />
         </div>
-        <input
-          type="hidden"
-          name="durationMin"
-          value={durationMin}
-          readOnly
-        />
+        <input type="hidden" name="durationMin" value={durationMin} readOnly />
         {errors.durationMin ? (
           <span className={styles.error}>{errors.durationMin}</span>
         ) : null}
@@ -200,7 +204,9 @@ export function WorkoutForm({
         {copy.form.intensity}
         <select
           value={intensity}
-          onChange={(event) => setIntensity(event.target.value as WorkoutIntensity | '')}
+          onChange={(event) =>
+            setIntensity(event.target.value as WorkoutIntensity | "")
+          }
         >
           <option value="">{copy.form.notSet}</option>
           <option value="low">{copy.form.low}</option>
@@ -232,5 +238,5 @@ export function WorkoutForm({
         </button>
       </div>
     </form>
-  )
+  );
 }

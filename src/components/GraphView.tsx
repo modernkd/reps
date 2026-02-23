@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   axisBottom,
@@ -13,12 +13,12 @@ import {
   scaleLinear,
   scaleTime,
   select,
-} from 'd3'
-import { format, parseISO } from 'date-fns'
-import gsap from 'gsap'
+} from "d3";
+import { format, parseISO } from "date-fns";
+import gsap from "gsap";
 
-import type { AppLanguage } from '@/lib/i18n'
-import { getCopy, getDateLocale, localizeWorkoutTypeName } from '@/lib/i18n'
+import type { AppLanguage } from "@/lib/i18n";
+import { getCopy, getDateLocale, localizeWorkoutTypeName } from "@/lib/i18n";
 import {
   getExerciseInsights,
   getRunProgressSeries,
@@ -26,40 +26,40 @@ import {
   getStrengthProgressSeries,
   type ExerciseInsightMetadata,
   type MajorMuscleGroup,
-} from '@/lib/selectors'
+} from "@/lib/selectors";
 import type {
   ProgressPoint,
   WeeklyTrendPoint,
   WeeklyTrendSeries,
   Workout,
   WorkoutType,
-} from '@/lib/types'
-import { useReducedMotion } from '@/lib/useReducedMotion'
+} from "@/lib/types";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
-import SimpleGraph from './react-bits/simple-graph'
-import styles from './styles/GraphView.module.css'
+import SimpleGraph from "./react-bits/simple-graph";
+import styles from "./styles/GraphView.module.css";
 
 type GraphViewProps = {
-  language: AppLanguage
-  series: WeeklyTrendSeries
-  workouts: Workout[]
-  workoutTypes: WorkoutType[]
-  selectedTypeIds: string[]
-  onPointSelect: (weekStart: string) => void
-}
+  language: AppLanguage;
+  series: WeeklyTrendSeries;
+  workouts: Workout[];
+  workoutTypes: WorkoutType[];
+  selectedTypeIds: string[];
+  onPointSelect: (weekStart: string) => void;
+};
 
 type TooltipState = {
-  x: number
-  y: number
-  point: WeeklyTrendPoint
-}
+  x: number;
+  y: number;
+  point: WeeklyTrendPoint;
+};
 
-const WIDTH = 900
-const HEIGHT = 360
-const MARGIN = { top: 18, right: 56, bottom: 34, left: 48 }
+const WIDTH = 900;
+const HEIGHT = 360;
+const MARGIN = { top: 18, right: 56, bottom: 34, left: 48 };
 
 function normalizeInsightKey(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function formatInsightLabel(value: string): string {
@@ -67,14 +67,14 @@ function formatInsightLabel(value: string): string {
     .split(/[\s_-]+/)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
+    .join(" ");
 }
 
 function getMuscleLabel(
-  graphCopy: ReturnType<typeof getCopy>['graph'],
+  graphCopy: ReturnType<typeof getCopy>["graph"],
   muscle: MajorMuscleGroup,
 ): string {
-  return graphCopy.muscles[muscle]
+  return graphCopy.muscles[muscle];
 }
 
 export function GraphView({
@@ -85,157 +85,168 @@ export function GraphView({
   selectedTypeIds,
   onPointSelect,
 }: GraphViewProps) {
-  const copy = getCopy(language)
-  const dateLocale = getDateLocale(language)
-  const reducedMotion = useReducedMotion()
-  const axisBottomRef = useRef<SVGGElement | null>(null)
-  const axisLeftRef = useRef<SVGGElement | null>(null)
-  const axisRightRef = useRef<SVGGElement | null>(null)
-  const chartRef = useRef<HTMLDivElement | null>(null)
-  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
-  const [focusTypeId, setFocusTypeId] = useState<string>('')
-  const [selectedExercise, setSelectedExercise] = useState<string>('')
-  const [runMetric, setRunMetric] = useState<'pace' | 'speed'>('pace')
+  const copy = getCopy(language);
+  const dateLocale = getDateLocale(language);
+  const reducedMotion = useReducedMotion();
+  const axisBottomRef = useRef<SVGGElement | null>(null);
+  const axisLeftRef = useRef<SVGGElement | null>(null);
+  const axisRightRef = useRef<SVGGElement | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [focusTypeId, setFocusTypeId] = useState<string>("");
+  const [selectedExercise, setSelectedExercise] = useState<string>("");
+  const [runMetric, setRunMetric] = useState<"pace" | "speed">("pace");
   const [metadataByExercise, setMetadataByExercise] = useState<
     Record<string, ExerciseInsightMetadata | undefined>
-  >({})
+  >({});
 
   const points = useMemo(
     () =>
       [...series.points].sort(
-        (a, b) => parseISO(a.weekStart).getTime() - parseISO(b.weekStart).getTime(),
+        (a, b) =>
+          parseISO(a.weekStart).getTime() - parseISO(b.weekStart).getTime(),
       ),
     [series.points],
-  )
+  );
 
-  const drawableWidth = WIDTH - MARGIN.left - MARGIN.right
-  const drawableHeight = HEIGHT - MARGIN.top - MARGIN.bottom
+  const drawableWidth = WIDTH - MARGIN.left - MARGIN.right;
+  const drawableHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-  const parsedDates = points.map((point) => parseISO(point.weekStart))
-  const dateExtent = extent(parsedDates)
+  const parsedDates = points.map((point) => parseISO(point.weekStart));
+  const dateExtent = extent(parsedDates);
   const xDomain: [Date, Date] =
     dateExtent[0] && dateExtent[1]
       ? [dateExtent[0], dateExtent[1]]
-      : [new Date(), new Date()]
+      : [new Date(), new Date()];
 
-  const maxFrequency = max(points, (point) => point.workoutsPerWeek) ?? 1
-  const maxDuration = max(points, (point) => point.totalDurationPerWeek) ?? 1
-  const weightPoints = points.filter((point) => point.avgWeightKg !== null)
-  const weekStarts = useMemo(() => points.map((point) => point.weekStart), [points])
+  const maxFrequency = max(points, (point) => point.workoutsPerWeek) ?? 1;
+  const maxDuration = max(points, (point) => point.totalDurationPerWeek) ?? 1;
+  const weightPoints = points.filter((point) => point.avgWeightKg !== null);
+  const weekStarts = useMemo(
+    () => points.map((point) => point.weekStart),
+    [points],
+  );
 
   const xScale = useMemo(
     () => scaleTime().domain(xDomain).range([0, drawableWidth]),
     [xDomain, drawableWidth],
-  )
+  );
 
   const yFrequency = useMemo(
     () =>
-      scaleLinear().domain([0, Math.max(1, maxFrequency)]).nice().range([drawableHeight, 0]),
+      scaleLinear()
+        .domain([0, Math.max(1, maxFrequency)])
+        .nice()
+        .range([drawableHeight, 0]),
     [drawableHeight, maxFrequency],
-  )
+  );
 
   const yDuration = useMemo(
     () =>
-      scaleLinear().domain([0, Math.max(1, maxDuration)]).nice().range([drawableHeight, 0]),
+      scaleLinear()
+        .domain([0, Math.max(1, maxDuration)])
+        .nice()
+        .range([drawableHeight, 0]),
     [drawableHeight, maxDuration],
-  )
+  );
 
   const frequencyPath = useMemo(() => {
     const shape = line<WeeklyTrendPoint>()
       .x((point) => xScale(parseISO(point.weekStart)))
       .y((point) => yFrequency(point.workoutsPerWeek))
-      .curve(curveMonotoneX)
-    return shape(points) ?? ''
-  }, [points, xScale, yFrequency])
+      .curve(curveMonotoneX);
+    return shape(points) ?? "";
+  }, [points, xScale, yFrequency]);
 
   const durationPath = useMemo(() => {
     const shape = line<WeeklyTrendPoint>()
       .x((point) => xScale(parseISO(point.weekStart)))
       .y((point) => yDuration(point.totalDurationPerWeek))
-      .curve(curveMonotoneX)
-    return shape(points) ?? ''
-  }, [points, xScale, yDuration])
+      .curve(curveMonotoneX);
+    return shape(points) ?? "";
+  }, [points, xScale, yDuration]);
 
   const scopedWorkouts = useMemo(() => {
-    const activeTypes = selectedTypeIds.length > 0 ? new Set(selectedTypeIds) : null
+    const activeTypes =
+      selectedTypeIds.length > 0 ? new Set(selectedTypeIds) : null;
 
     return workouts.filter((workout) =>
       activeTypes ? activeTypes.has(workout.type) : true,
-    )
-  }, [selectedTypeIds, workouts])
+    );
+  }, [selectedTypeIds, workouts]);
 
   const insightLookupNames = useMemo(() => {
-    const keys = new Set<string>()
+    const keys = new Set<string>();
 
     for (const workout of scopedWorkouts) {
       for (const setLog of workout.sessionSummary?.setLogs ?? []) {
         if (setLog.exerciseName?.trim()) {
-          keys.add(setLog.exerciseName.trim())
+          keys.add(setLog.exerciseName.trim());
         }
         if (setLog.exerciseId?.trim()) {
-          keys.add(setLog.exerciseId.trim())
+          keys.add(setLog.exerciseId.trim());
         }
       }
     }
 
-    return [...keys]
-  }, [scopedWorkouts])
+    return [...keys];
+  }, [scopedWorkouts]);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     async function loadInsightMetadata() {
       if (insightLookupNames.length === 0) {
         if (!cancelled) {
-          setMetadataByExercise({})
+          setMetadataByExercise({});
         }
-        return
+        return;
       }
 
-      const { getExerciseByName } = await import('@/lib/exerciseDb')
+      const { getExerciseByName } = await import("@/lib/exerciseDb");
       const lookups = await Promise.all(
         insightLookupNames.map(async (rawKey) => ({
           rawKey,
           exercise: await getExerciseByName(rawKey),
         })),
-      )
+      );
 
       if (cancelled) {
-        return
+        return;
       }
 
-      const next: Record<string, ExerciseInsightMetadata | undefined> = {}
+      const next: Record<string, ExerciseInsightMetadata | undefined> = {};
       for (const lookup of lookups) {
-        const normalizedRaw = normalizeInsightKey(lookup.rawKey)
+        const normalizedRaw = normalizeInsightKey(lookup.rawKey);
         if (!normalizedRaw) {
-          continue
+          continue;
         }
 
-        const exercise = lookup.exercise
+        const exercise = lookup.exercise;
         if (!exercise) {
-          continue
+          continue;
         }
 
         const metadata: ExerciseInsightMetadata = {
           equipment: exercise.equipment,
           level: exercise.level,
           primaryMuscles: exercise.primaryMuscles,
-        }
+        };
 
-        next[normalizedRaw] = metadata
-        next[normalizeInsightKey(exercise.name)] = metadata
-        next[normalizeInsightKey(exercise.id)] = metadata
+        next[normalizedRaw] = metadata;
+        next[normalizeInsightKey(exercise.name)] = metadata;
+        next[normalizeInsightKey(exercise.id)] = metadata;
       }
 
-      setMetadataByExercise(next)
+      setMetadataByExercise(next);
     }
 
-    void loadInsightMetadata()
+    void loadInsightMetadata();
 
     return () => {
-      cancelled = true
-    }
-  }, [insightLookupNames])
+      cancelled = true;
+    };
+  }, [insightLookupNames]);
 
   const exerciseInsights = useMemo(
     () =>
@@ -245,86 +256,94 @@ export function GraphView({
         metadataByExercise,
       }),
     [metadataByExercise, scopedWorkouts, weekStarts],
-  )
+  );
 
   const muscleCoverageMax = useMemo(() => {
     const values = exerciseInsights.muscleCoverage.flatMap((week) =>
       exerciseInsights.muscleGroups.map((muscle) => week.muscles[muscle]),
-    )
+    );
 
-    return max(values) ?? 0
-  }, [exerciseInsights])
+    return max(values) ?? 0;
+  }, [exerciseInsights]);
 
   const hasMuscleCoverage = useMemo(
     () =>
       exerciseInsights.muscleCoverage.some((week) =>
-        exerciseInsights.muscleGroups.some((muscle) => week.muscles[muscle] > 0),
+        exerciseInsights.muscleGroups.some(
+          (muscle) => week.muscles[muscle] > 0,
+        ),
       ),
     [exerciseInsights],
-  )
+  );
 
   const balanceTotal =
     exerciseInsights.balance.push +
     exerciseInsights.balance.pull +
-    exerciseInsights.balance.lower
+    exerciseInsights.balance.lower;
 
   const balanceItems = [
     {
-      key: 'push',
+      key: "push",
       label: copy.graph.pushLabel,
       value: exerciseInsights.balance.push,
     },
     {
-      key: 'pull',
+      key: "pull",
       label: copy.graph.pullLabel,
       value: exerciseInsights.balance.pull,
     },
     {
-      key: 'lower',
+      key: "lower",
       label: copy.graph.lowerLabel,
       value: exerciseInsights.balance.lower,
     },
-  ] as const
+  ] as const;
 
   const typeOptions = useMemo(() => {
-    const present = new Set(scopedWorkouts.map((workout) => workout.type))
-    return workoutTypes.filter((type) => present.has(type.id))
-  }, [scopedWorkouts, workoutTypes])
+    const present = new Set(scopedWorkouts.map((workout) => workout.type));
+    return workoutTypes.filter((type) => present.has(type.id));
+  }, [scopedWorkouts, workoutTypes]);
 
   useEffect(() => {
-    const fallback = typeOptions[0]?.id ?? ''
+    const fallback = typeOptions[0]?.id ?? "";
 
     if (!focusTypeId || !typeOptions.some((type) => type.id === focusTypeId)) {
-      setFocusTypeId(fallback)
+      setFocusTypeId(fallback);
     }
-  }, [focusTypeId, typeOptions])
+  }, [focusTypeId, typeOptions]);
 
-  const isRunLike = focusTypeId === 'run' || focusTypeId === 'cardio'
+  const isRunLike = focusTypeId === "run" || focusTypeId === "cardio";
 
   const strengthExerciseNames = useMemo(
     () =>
       focusTypeId
-        ? getStrengthExerciseNames({ workouts: scopedWorkouts, typeId: focusTypeId })
+        ? getStrengthExerciseNames({
+            workouts: scopedWorkouts,
+            typeId: focusTypeId,
+          })
         : [],
     [focusTypeId, scopedWorkouts],
-  )
+  );
 
   useEffect(() => {
-    const fallback = strengthExerciseNames[0] ?? ''
+    const fallback = strengthExerciseNames[0] ?? "";
 
     if (isRunLike) {
-      setSelectedExercise('')
-      return
+      setSelectedExercise("");
+      return;
     }
 
-    if (!selectedExercise || !strengthExerciseNames.includes(selectedExercise)) {
-      setSelectedExercise(fallback)
+    if (
+      !selectedExercise ||
+      !strengthExerciseNames.includes(selectedExercise)
+    ) {
+      setSelectedExercise(fallback);
     }
-  }, [isRunLike, selectedExercise, strengthExerciseNames])
+  }, [isRunLike, selectedExercise, strengthExerciseNames]);
 
   const performancePoints = useMemo<ProgressPoint[]>(() => {
     if (!focusTypeId) {
-      return []
+      return [];
     }
 
     if (isRunLike) {
@@ -332,82 +351,90 @@ export function GraphView({
         workouts: scopedWorkouts,
         typeId: focusTypeId,
         metric: runMetric,
-      })
+      });
     }
 
     if (!selectedExercise) {
-      return []
+      return [];
     }
 
     return getStrengthProgressSeries({
       workouts: scopedWorkouts,
       typeId: focusTypeId,
       exerciseName: selectedExercise,
-    })
-  }, [focusTypeId, isRunLike, runMetric, scopedWorkouts, selectedExercise])
+    });
+  }, [focusTypeId, isRunLike, runMetric, scopedWorkouts, selectedExercise]);
 
   const performanceYLabel = isRunLike
-    ? runMetric === 'pace'
+    ? runMetric === "pace"
       ? copy.graph.yPace
       : copy.graph.ySpeed
-    : copy.graph.yStrength
+    : copy.graph.yStrength;
 
   const performanceTitle = isRunLike
-    ? runMetric === 'pace'
+    ? runMetric === "pace"
       ? copy.graph.runPaceProgress
       : copy.graph.runSpeedProgress
     : selectedExercise
       ? `${selectedExercise} ${copy.graph.exerciseProgressSuffix}`
-      : copy.graph.exerciseProgress
+      : copy.graph.exerciseProgress;
 
   const weightTrendData = useMemo(
     () =>
       weightPoints.map((point) => ({
         value: point.avgWeightKg ?? 0,
-        label: format(parseISO(point.weekStart), 'MMM d', { locale: dateLocale }),
+        label: format(parseISO(point.weekStart), "MMM d", {
+          locale: dateLocale,
+        }),
       })),
     [dateLocale, weightPoints],
-  )
+  );
 
   const performanceTrendData = useMemo(
     () =>
       performancePoints.map((point) => ({
         value: point.value,
-        label: format(parseISO(point.date), 'MMM d', { locale: dateLocale }),
+        label: format(parseISO(point.date), "MMM d", { locale: dateLocale }),
       })),
     [dateLocale, performancePoints],
-  )
+  );
 
   useEffect(() => {
-    if (!axisBottomRef.current || !axisLeftRef.current || !axisRightRef.current) {
-      return
+    if (
+      !axisBottomRef.current ||
+      !axisLeftRef.current ||
+      !axisRightRef.current
+    ) {
+      return;
     }
 
     const xAxis = axisBottom<Date>(xScale)
       .ticks(Math.min(8, points.length))
-      .tickFormat((value) => format(value, 'MMM d', { locale: dateLocale }))
+      .tickFormat((value) => format(value, "MMM d", { locale: dateLocale }));
 
-    const leftAxis = axisLeft(yFrequency).ticks(6)
-    const rightAxis = axisRight(yDuration).ticks(6)
+    const leftAxis = axisLeft(yFrequency).ticks(6);
+    const rightAxis = axisRight(yDuration).ticks(6);
 
-    select(axisBottomRef.current).call(xAxis)
-    select(axisLeftRef.current).call(leftAxis)
-    select(axisRightRef.current).call(rightAxis)
-  }, [dateLocale, points.length, xScale, yDuration, yFrequency])
+    select(axisBottomRef.current).call(xAxis);
+    select(axisLeftRef.current).call(leftAxis);
+    select(axisRightRef.current).call(rightAxis);
+  }, [dateLocale, points.length, xScale, yDuration, yFrequency]);
 
   useEffect(() => {
     if (!chartRef.current || reducedMotion) {
-      return
+      return;
     }
 
-    const lines = chartRef.current.querySelectorAll('path[data-anim="line"]')
-    const pointsNodes = chartRef.current.querySelectorAll('circle[data-anim="point"]')
+    const lines = chartRef.current.querySelectorAll('path[data-anim="line"]');
+    const pointsNodes = chartRef.current.querySelectorAll(
+      'circle[data-anim="point"]',
+    );
 
     gsap.fromTo(
       lines,
       { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' },
-    )
+      { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" },
+    );
     gsap.fromTo(
       pointsNodes,
       { opacity: 0, scale: 0.85 },
@@ -415,38 +442,38 @@ export function GraphView({
         opacity: 1,
         scale: 1,
         duration: 0.26,
-        ease: 'power2.out',
+        ease: "power2.out",
         stagger: 0.015,
       },
-    )
-  }, [performancePoints, points, reducedMotion])
+    );
+  }, [performancePoints, points, reducedMotion]);
 
   const onPointerMove = (event: React.PointerEvent<SVGRectElement>) => {
     if (points.length === 0) {
-      return
+      return;
     }
 
-    const target = event.currentTarget
-    const bounds = target.getBoundingClientRect()
-    const localX = event.clientX - bounds.left
-    const domainX = xScale.invert(localX)
+    const target = event.currentTarget;
+    const bounds = target.getBoundingClientRect();
+    const localX = event.clientX - bounds.left;
+    const domainX = xScale.invert(localX);
 
     const dateBisector = bisector<WeeklyTrendPoint, Date>((point) =>
       parseISO(point.weekStart),
-    ).center
-    const nearestIndex = dateBisector(points, domainX)
-    const point = points[nearestIndex]
+    ).center;
+    const nearestIndex = dateBisector(points, domainX);
+    const point = points[nearestIndex];
 
     if (!point) {
-      return
+      return;
     }
 
     setTooltip({
       x: MARGIN.left + xScale(parseISO(point.weekStart)),
       y: MARGIN.top + yFrequency(point.workoutsPerWeek),
       point,
-    })
-  }
+    });
+  };
 
   if (points.length === 0) {
     return (
@@ -454,7 +481,7 @@ export function GraphView({
         <h3>{copy.graph.noWorkoutData}</h3>
         <p>{copy.graph.logToUnlock}</p>
       </section>
-    )
+    );
   }
 
   return (
@@ -495,11 +522,19 @@ export function GraphView({
               ))}
             </g>
 
-            <path data-anim="line" d={durationPath} className={styles.durationPath} />
-            <path data-anim="line" d={frequencyPath} className={styles.frequencyPath} />
+            <path
+              data-anim="line"
+              d={durationPath}
+              className={styles.durationPath}
+            />
+            <path
+              data-anim="line"
+              d={frequencyPath}
+              className={styles.frequencyPath}
+            />
 
             {points.map((point) => {
-              const x = xScale(parseISO(point.weekStart))
+              const x = xScale(parseISO(point.weekStart));
               return (
                 <g key={point.weekStart}>
                   <circle
@@ -510,7 +545,7 @@ export function GraphView({
                     r={4.2}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${format(parseISO(point.weekStart), 'MMM d', {
+                    aria-label={`${format(parseISO(point.weekStart), "MMM d", {
                       locale: dateLocale,
                     })}: ${copy.graph.tooltipWorkouts(point.workoutsPerWeek)}`}
                     onClick={() => onPointSelect(point.weekStart)}
@@ -522,9 +557,9 @@ export function GraphView({
                       })
                     }
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        onPointSelect(point.weekStart)
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onPointSelect(point.weekStart);
                       }
                     }}
                   />
@@ -536,24 +571,30 @@ export function GraphView({
                     r={3.5}
                     role="button"
                     tabIndex={0}
-                    aria-label={`${format(parseISO(point.weekStart), 'MMM d', {
+                    aria-label={`${format(parseISO(point.weekStart), "MMM d", {
                       locale: dateLocale,
-                    })}: ${d3Format(',')(point.totalDurationPerWeek)} min`}
+                    })}: ${d3Format(",")(point.totalDurationPerWeek)} min`}
                     onClick={() => onPointSelect(point.weekStart)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        onPointSelect(point.weekStart)
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onPointSelect(point.weekStart);
                       }
                     }}
                   />
                 </g>
-              )
+              );
             })}
 
-            <g ref={axisBottomRef} transform={`translate(0, ${drawableHeight})`} />
+            <g
+              ref={axisBottomRef}
+              transform={`translate(0, ${drawableHeight})`}
+            />
             <g ref={axisLeftRef} />
-            <g ref={axisRightRef} transform={`translate(${drawableWidth}, 0)`} />
+            <g
+              ref={axisRightRef}
+              transform={`translate(${drawableWidth}, 0)`}
+            />
 
             <rect
               x={0}
@@ -574,11 +615,19 @@ export function GraphView({
             role="status"
             aria-live="polite"
           >
-            <strong>{format(parseISO(tooltip.point.weekStart), 'MMM d', { locale: dateLocale })}</strong>
-            <span>{copy.graph.tooltipWorkouts(tooltip.point.workoutsPerWeek)}</span>
-            <span>{d3Format(',')(tooltip.point.totalDurationPerWeek)} min</span>
+            <strong>
+              {format(parseISO(tooltip.point.weekStart), "MMM d", {
+                locale: dateLocale,
+              })}
+            </strong>
+            <span>
+              {copy.graph.tooltipWorkouts(tooltip.point.workoutsPerWeek)}
+            </span>
+            <span>{d3Format(",")(tooltip.point.totalDurationPerWeek)} min</span>
             {tooltip.point.avgWeightKg ? (
-              <span>{copy.graph.tooltipAvgWeight(tooltip.point.avgWeightKg)}</span>
+              <span>
+                {copy.graph.tooltipAvgWeight(tooltip.point.avgWeightKg)}
+              </span>
             ) : null}
           </div>
         ) : null}
@@ -600,7 +649,10 @@ export function GraphView({
             gridStyle="dashed"
             className={styles.simpleGraph}
           />
-          <p className={styles.metricLabel} aria-label={copy.graph.avgWeightAria}>
+          <p
+            className={styles.metricLabel}
+            aria-label={copy.graph.avgWeightAria}
+          >
             kg
           </p>
         </div>
@@ -632,7 +684,7 @@ export function GraphView({
                 <select
                   value={runMetric}
                   onChange={(event) =>
-                    setRunMetric(event.target.value as 'pace' | 'speed')
+                    setRunMetric(event.target.value as "pace" | "speed")
                   }
                 >
                   <option value="pace">{copy.graph.pace}</option>
@@ -673,9 +725,7 @@ export function GraphView({
           />
         ) : (
           <p className={styles.weightHint}>
-            {isRunLike
-              ? copy.graph.noRunData
-              : copy.graph.noStrengthData}
+            {isRunLike ? copy.graph.noRunData : copy.graph.noStrengthData}
           </p>
         )}
 
@@ -699,10 +749,15 @@ export function GraphView({
               )}, minmax(2.3rem, 1fr))`,
             }}
           >
-            <div className={styles.coverageRowLabel}>{copy.graph.muscleLabel}</div>
+            <div className={styles.coverageRowLabel}>
+              {copy.graph.muscleLabel}
+            </div>
             {weekStarts.map((weekStart) => (
-              <div key={`week-header-${weekStart}`} className={styles.coverageColumnLabel}>
-                {format(parseISO(weekStart), 'MMM d', { locale: dateLocale })}
+              <div
+                key={`week-header-${weekStart}`}
+                className={styles.coverageColumnLabel}
+              >
+                {format(parseISO(weekStart), "MMM d", { locale: dateLocale })}
               </div>
             ))}
 
@@ -712,11 +767,11 @@ export function GraphView({
                   {getMuscleLabel(copy.graph, muscle)}
                 </div>
                 {exerciseInsights.muscleCoverage.map((week) => {
-                  const value = week.muscles[muscle]
+                  const value = week.muscles[muscle];
                   const intensity =
                     muscleCoverageMax > 0
                       ? Math.min(4, Math.ceil((value / muscleCoverageMax) * 4))
-                      : 0
+                      : 0;
 
                   return (
                     <div
@@ -734,19 +789,21 @@ export function GraphView({
                       }`}
                       aria-label={`${getMuscleLabel(copy.graph, muscle)} ${format(
                         parseISO(week.weekStart),
-                        'MMM d',
+                        "MMM d",
                         { locale: dateLocale },
                       )}: ${value}`}
                     >
-                      {value > 0 ? value : ''}
+                      {value > 0 ? value : ""}
                     </div>
-                  )
+                  );
                 })}
               </Fragment>
             ))}
           </div>
         ) : (
-          <p className={styles.insightEmpty}>{copy.graph.muscleCoverageEmpty}</p>
+          <p className={styles.insightEmpty}>
+            {copy.graph.muscleCoverageEmpty}
+          </p>
         )}
       </section>
 
@@ -759,7 +816,8 @@ export function GraphView({
           <>
             <div className={styles.balanceGrid}>
               {balanceItems.map((item) => {
-                const ratio = balanceTotal > 0 ? (item.value / balanceTotal) * 100 : 0
+                const ratio =
+                  balanceTotal > 0 ? (item.value / balanceTotal) * 100 : 0;
                 return (
                   <article key={item.key} className={styles.balanceCard}>
                     <div className={styles.balanceRow}>
@@ -767,13 +825,18 @@ export function GraphView({
                       <strong>{item.value.toFixed(1)}</strong>
                     </div>
                     <div className={styles.balanceTrack} aria-hidden>
-                      <span className={styles.balanceFill} style={{ width: `${ratio}%` }} />
+                      <span
+                        className={styles.balanceFill}
+                        style={{ width: `${ratio}%` }}
+                      />
                     </div>
                   </article>
-                )
+                );
               })}
             </div>
-            <p className={styles.insightMeta}>{copy.graph.totalSets(balanceTotal)}</p>
+            <p className={styles.insightMeta}>
+              {copy.graph.totalSets(balanceTotal)}
+            </p>
           </>
         ) : (
           <p className={styles.insightEmpty}>{copy.graph.balanceEmpty}</p>
@@ -788,7 +851,7 @@ export function GraphView({
         {exerciseInsights.equipmentTrends.length > 0 ? (
           <div className={styles.trendRows}>
             {exerciseInsights.equipmentTrends.map((trend) => {
-              const peak = Math.max(1, ...trend.points)
+              const peak = Math.max(1, ...trend.points);
 
               return (
                 <article key={trend.key} className={styles.trendRow}>
@@ -803,26 +866,38 @@ export function GraphView({
                     }}
                   >
                     {trend.points.map((value, index) => (
-                      <div key={`${trend.key}-${index}`} className={styles.trendBarWrap}>
+                      <div
+                        key={`${trend.key}-${index}`}
+                        className={styles.trendBarWrap}
+                      >
                         <div
                           className={styles.trendBar}
                           style={{
-                            height: value > 0 ? `${Math.max(20, (value / peak) * 100)}%` : '8%',
+                            height:
+                              value > 0
+                                ? `${Math.max(20, (value / peak) * 100)}%`
+                                : "8%",
                             opacity: value > 0 ? 0.9 : 0.35,
                           }}
-                          title={`${format(parseISO(weekStarts[index] ?? weekStarts[0]), 'MMM d', {
-                            locale: dateLocale,
-                          })}: ${value}`}
+                          title={`${format(
+                            parseISO(weekStarts[index] ?? weekStarts[0]),
+                            "MMM d",
+                            {
+                              locale: dateLocale,
+                            },
+                          )}: ${value}`}
                         />
                       </div>
                     ))}
                   </div>
                 </article>
-              )
+              );
             })}
           </div>
         ) : (
-          <p className={styles.insightEmpty}>{copy.graph.equipmentTrendsEmpty}</p>
+          <p className={styles.insightEmpty}>
+            {copy.graph.equipmentTrendsEmpty}
+          </p>
         )}
       </section>
 
@@ -834,7 +909,7 @@ export function GraphView({
         {exerciseInsights.difficultyTrends.length > 0 ? (
           <div className={styles.trendRows}>
             {exerciseInsights.difficultyTrends.map((trend) => {
-              const peak = Math.max(1, ...trend.points)
+              const peak = Math.max(1, ...trend.points);
 
               return (
                 <article key={trend.key} className={styles.trendRow}>
@@ -849,28 +924,40 @@ export function GraphView({
                     }}
                   >
                     {trend.points.map((value, index) => (
-                      <div key={`${trend.key}-${index}`} className={styles.trendBarWrap}>
+                      <div
+                        key={`${trend.key}-${index}`}
+                        className={styles.trendBarWrap}
+                      >
                         <div
                           className={styles.trendBar}
                           style={{
-                            height: value > 0 ? `${Math.max(20, (value / peak) * 100)}%` : '8%',
+                            height:
+                              value > 0
+                                ? `${Math.max(20, (value / peak) * 100)}%`
+                                : "8%",
                             opacity: value > 0 ? 0.9 : 0.35,
                           }}
-                          title={`${format(parseISO(weekStarts[index] ?? weekStarts[0]), 'MMM d', {
-                            locale: dateLocale,
-                          })}: ${value}`}
+                          title={`${format(
+                            parseISO(weekStarts[index] ?? weekStarts[0]),
+                            "MMM d",
+                            {
+                              locale: dateLocale,
+                            },
+                          )}: ${value}`}
                         />
                       </div>
                     ))}
                   </div>
                 </article>
-              )
+              );
             })}
           </div>
         ) : (
-          <p className={styles.insightEmpty}>{copy.graph.difficultyTrendsEmpty}</p>
+          <p className={styles.insightEmpty}>
+            {copy.graph.difficultyTrendsEmpty}
+          </p>
         )}
       </section>
     </section>
-  )
+  );
 }

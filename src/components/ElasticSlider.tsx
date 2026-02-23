@@ -1,9 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { animate, motion, useMotionValue, useMotionValueEvent, useTransform } from 'motion/react';
-import { Icon } from '@chakra-ui/react';
-import { RiVolumeDownFill, RiVolumeUpFill } from 'react-icons/ri';
+import React, { useEffect, useRef, useState } from "react";
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useTransform,
+} from "motion/react";
+import { Icon } from "@chakra-ui/react";
+import { RiVolumeDownFill, RiVolumeUpFill } from "react-icons/ri";
 
-import './ElasticSlider.css';
+import "./ElasticSlider.css";
 
 const MAX_OVERFLOW = 50;
 
@@ -28,13 +34,13 @@ const ElasticSlider: React.FC<ElasticSliderProps> = ({
   defaultValue = 50,
   startingValue = 0,
   maxValue = 100,
-  className = '',
+  className = "",
   isStepped = false,
   stepSize = 1,
-  ariaLabel = 'Value slider',
+  ariaLabel = "Value slider",
   valueFormatter = (nextValue) => String(Math.round(nextValue)),
   leftIcon = <Icon as={RiVolumeDownFill} />,
-  rightIcon = <Icon as={RiVolumeUpFill} />
+  rightIcon = <Icon as={RiVolumeUpFill} />,
 }) => {
   return (
     <div className={`slider-container ${className}`}>
@@ -80,11 +86,11 @@ const Slider: React.FC<SliderProps> = ({
   ariaLabel,
   valueFormatter,
   leftIcon,
-  rightIcon
+  rightIcon,
 }) => {
   const [internalValue, setInternalValue] = useState<number>(defaultValue);
   const sliderRef = useRef<HTMLDivElement>(null);
-  const [region, setRegion] = useState<'left' | 'middle' | 'right'>('middle');
+  const [region, setRegion] = useState<"left" | "middle" | "right">("middle");
   const clientX = useMotionValue(0);
   const overflow = useMotionValue(0);
   const scale = useMotionValue(1);
@@ -104,18 +110,18 @@ const Slider: React.FC<SliderProps> = ({
     onChange?.(nextValue);
   };
 
-  useMotionValueEvent(clientX, 'change', (latest: number) => {
+  useMotionValueEvent(clientX, "change", (latest: number) => {
     if (sliderRef.current) {
       const { left, right } = sliderRef.current.getBoundingClientRect();
       let newValue: number;
       if (latest < left) {
-        setRegion('left');
+        setRegion("left");
         newValue = left - latest;
       } else if (latest > right) {
-        setRegion('right');
+        setRegion("right");
         newValue = latest - right;
       } else {
-        setRegion('middle');
+        setRegion("middle");
         newValue = 0;
       }
       overflow.jump(decay(newValue, MAX_OVERFLOW));
@@ -125,7 +131,9 @@ const Slider: React.FC<SliderProps> = ({
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.buttons > 0 && sliderRef.current) {
       const { left, width } = sliderRef.current.getBoundingClientRect();
-      let newValue = startingValue + ((e.clientX - left) / width) * (maxValue - startingValue);
+      let newValue =
+        startingValue +
+        ((e.clientX - left) / width) * (maxValue - startingValue);
       if (isStepped) {
         newValue = Math.round(newValue / stepSize) * stepSize;
       }
@@ -141,7 +149,7 @@ const Slider: React.FC<SliderProps> = ({
   };
 
   const handlePointerUp = () => {
-    animate(overflow, 0, { type: 'spring', bounce: 0.5 });
+    animate(overflow, 0, { type: "spring", bounce: 0.5 });
   };
 
   const getRangePercentage = (): number => {
@@ -156,13 +164,13 @@ const Slider: React.FC<SliderProps> = ({
 
     let nextValue = currentValue;
 
-    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") {
       nextValue = Math.min(maxValue, currentValue + accelerate);
-    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       nextValue = Math.max(startingValue, currentValue - accelerate);
-    } else if (event.key === 'Home') {
+    } else if (event.key === "Home") {
       nextValue = startingValue;
-    } else if (event.key === 'End') {
+    } else if (event.key === "End") {
       nextValue = maxValue;
     } else {
       return;
@@ -181,17 +189,19 @@ const Slider: React.FC<SliderProps> = ({
         onTouchEnd={() => animate(scale, 1)}
         style={{
           scale,
-          opacity: useTransform(scale, [1, 1.2], [0.7, 1])
+          opacity: useTransform(scale, [1, 1.2], [0.7, 1]),
         }}
         className="slider-wrapper"
       >
         <motion.div
           animate={{
-            scale: region === 'left' ? [1, 1.4, 1] : 1,
-            transition: { duration: 0.25 }
+            scale: region === "left" ? [1, 1.4, 1] : 1,
+            transition: { duration: 0.25 },
           }}
           style={{
-            x: useTransform(() => (region === 'left' ? -overflow.get() / scale.get() : 0))
+            x: useTransform(() =>
+              region === "left" ? -overflow.get() / scale.get() : 0,
+            ),
           }}
         >
           {leftIcon}
@@ -224,30 +234,36 @@ const Slider: React.FC<SliderProps> = ({
               scaleY: useTransform(overflow, [0, MAX_OVERFLOW], [1, 0.8]),
               transformOrigin: useTransform(() => {
                 if (sliderRef.current) {
-                  const { left, width } = sliderRef.current.getBoundingClientRect();
-                  return clientX.get() < left + width / 2 ? 'right' : 'left';
+                  const { left, width } =
+                    sliderRef.current.getBoundingClientRect();
+                  return clientX.get() < left + width / 2 ? "right" : "left";
                 }
-                return 'center';
+                return "center";
               }),
               height: useTransform(scale, [1, 1.2], [6, 12]),
               marginTop: useTransform(scale, [1, 1.2], [0, -3]),
-              marginBottom: useTransform(scale, [1, 1.2], [0, -3])
+              marginBottom: useTransform(scale, [1, 1.2], [0, -3]),
             }}
             className="slider-track-wrapper"
           >
             <div className="slider-track">
-              <div className="slider-range" style={{ width: `${getRangePercentage()}%` }} />
+              <div
+                className="slider-range"
+                style={{ width: `${getRangePercentage()}%` }}
+              />
             </div>
           </motion.div>
         </div>
 
         <motion.div
           animate={{
-            scale: region === 'right' ? [1, 1.4, 1] : 1,
-            transition: { duration: 0.25 }
+            scale: region === "right" ? [1, 1.4, 1] : 1,
+            transition: { duration: 0.25 },
           }}
           style={{
-            x: useTransform(() => (region === 'right' ? overflow.get() / scale.get() : 0))
+            x: useTransform(() =>
+              region === "right" ? overflow.get() / scale.get() : 0,
+            ),
           }}
         >
           {rightIcon}
