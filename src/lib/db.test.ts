@@ -2,37 +2,38 @@ import { parseISO } from "date-fns";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  activeSessionDraftsCollection,
-  addWorkout,
-  applyTemplateToCalendar,
-  clearDataAfterDate,
-  clearDataBeforeDate,
-  clearAllUncompletedSessions,
-  completeGuidedSession,
-  createPlanTemplate,
-  deleteWorkout,
-  deletePlanTemplate,
-  duplicateScheduledSession,
-  exerciseTemplatesCollection,
-  exportWorkoutDataSnapshot,
-  generateScheduleForRange,
-  getOrCreateSessionPlan,
-  importStarterTemplate,
   LAST_TEMPLATE_DELETE_ERROR,
   MANUAL_PLAN_DAY_ID,
   MANUAL_TEMPLATE_ID,
   MIN_TEMPLATE_COUNT,
+  activeSessionDraftsCollection,
+  addWorkout,
+  applyTemplateToCalendar,
+  clearAllUncompletedSessions,
+  clearDataAfterDate,
+  clearDataBeforeDate,
+  completeGuidedSession,
+  createPlanTemplate,
+  deletePlanTemplate,
+  deleteWorkout,
+  duplicateScheduledSession,
+  exerciseTemplatesCollection,
+  exerciseCatalogCollection,
+  exportWorkoutDataSnapshot,
+  generateScheduleForRange,
+  getOrCreateSessionPlan,
+  importStarterTemplate,
   moveScheduledSessionToDate,
   planDaysCollection,
   planManualWorkout,
   planTemplatesCollection,
   replaceWorkoutDataSnapshot,
   scheduledSessionsCollection,
-  serializeWorkoutDataSnapshot,
   sessionPlansCollection,
   resetCompletedSession,
   updatePlanTemplate,
   updateWorkout,
+  workoutTypesCollection,
   workoutsCollection,
 } from "./db";
 
@@ -1200,9 +1201,25 @@ describe("workout data snapshot sync", () => {
     });
 
     await getOrCreateSessionPlan(manualSession.id);
+    
+    await addWorkout({
+      date: "2026-02-20",
+      type: "lift",
+      durationMin: 40,
+      notes: "completed workout test",
+    });
+
+    // ensure everything is flushed to IDB
+    await Promise.all([
+      workoutsCollection.preload(),
+      planTemplatesCollection.preload(),
+      scheduledSessionsCollection.preload(),
+      sessionPlansCollection.preload(),
+      exerciseCatalogCollection.preload(),
+      workoutTypesCollection.preload(),
+    ]);
 
     const snapshot = exportWorkoutDataSnapshot();
-    const snapshotJson = serializeWorkoutDataSnapshot(snapshot);
 
     await clearSessionDraftCollection();
     await clearCollection(sessionPlansCollection);
@@ -1211,6 +1228,8 @@ describe("workout data snapshot sync", () => {
     await clearCollection(exerciseTemplatesCollection);
     await clearCollection(planDaysCollection);
     await clearCollection(planTemplatesCollection);
+    await clearCollection(exerciseCatalogCollection);
+    await clearCollection(workoutTypesCollection);
 
     await replaceWorkoutDataSnapshot(snapshot);
     await Promise.all([
@@ -1224,8 +1243,12 @@ describe("workout data snapshot sync", () => {
     expect(workoutsCollection.toArray.length).toBeGreaterThan(0);
     expect(scheduledSessionsCollection.has(manualSession.id)).toBe(true);
     expect(sessionPlansCollection.has(manualSession.id)).toBe(true);
-    expect(serializeWorkoutDataSnapshot(exportWorkoutDataSnapshot())).toBe(
-      snapshotJson,
-    );
+    
+    const newSnapshot = exportWorkoutDataSnapshot();
+    // Ignore exportedAt when comparing as it will be slightly different
+    expect({ ...newSnapshot, exportedAt: "" }).toEqual({
+      ...snapshot,
+      exportedAt: "",
+    });
   });
 });

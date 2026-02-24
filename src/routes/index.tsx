@@ -491,7 +491,13 @@ function WorkoutDashboard() {
   const previewPlan = previewSessionId
     ? sessionPlans.find((plan) => plan.sessionId === previewSessionId)
     : undefined;
+  const hydratedUserIdRef = useRef<string | null>(null);
+
   const hydrateCloudState = async (userId: string) => {
+    if (hydratedUserIdRef.current === userId) {
+      return; // Already hydrated for this user in this session.
+    }
+
     cloudSyncReadyRef.current = false;
 
     try {
@@ -511,10 +517,12 @@ function WorkoutDashboard() {
         lastCloudSnapshotRef.current =
           serializeWorkoutDataSnapshot(localSnapshot);
       }
+      
+      hydratedUserIdRef.current = userId;
+      cloudSyncReadyRef.current = true;
     } catch {
       // Keep local state intact when cloud sync fails.
-    } finally {
-      cloudSyncReadyRef.current = true;
+      // Do not mark as ready so we don't overwrite remote data on next sync cycle.
     }
   };
 
@@ -583,6 +591,7 @@ function WorkoutDashboard() {
         setCloudUser(null);
         lastCloudSnapshotRef.current = null;
         cloudSyncReadyRef.current = false;
+        hydratedUserIdRef.current = null;
         return;
       }
 
