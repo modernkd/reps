@@ -8,7 +8,7 @@ import {
   useAnimation,
   useMotionValue,
   useTransform,
-} from "framer-motion";
+} from "motion/react";
 
 import styles from "./styles/ScrubSlider.module.css";
 
