@@ -45,11 +45,29 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   padding: 0.2rem;
   background: color-mix(in srgb, var(--surface-0) 90%, transparent);
   box-shadow: var(--shadow-1);
+}
+
+.accountButton {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  font-size: 0.82rem;
+  padding: 0.42rem 0.7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 500;
+  box-shadow: var(--shadow-skeuo-base);
+}
+
+.accountButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
+  outline-offset: 2px;
 }
 
 .iconButton {

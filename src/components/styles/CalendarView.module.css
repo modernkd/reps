@@ -1,5 +1,5 @@
 .wrapper {
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
@@ -23,7 +23,9 @@
 }
 
 .monthButton {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--surface-0);
   padding: 0.4rem 0.75rem;
@@ -70,7 +72,7 @@
 }
 
 .day {
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface-0);
   min-height: clamp(3.85rem, 13vw, 5.3rem);
@@ -147,6 +149,18 @@
   border-color: color-mix(in srgb, #ee8f2a 56%, var(--ink-200));
 }
 
+@media (min-width: 1200px) {
+  .grid {
+    gap: 0.52rem;
+    padding: 0.7rem;
+  }
+
+  .day {
+    min-height: clamp(4.5rem, 8vh, 6.1rem);
+    padding: 0.48rem;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .day:hover {
     transform: translateY(-1px);
@@ -199,6 +213,8 @@
   }
 
   .monthButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     padding: 0.34rem 0.52rem;
     font-size: 0.72rem;
   }
@@ -246,6 +262,8 @@
   }
 
   .monthButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     min-height: 2rem;
     padding: 0.3rem 0.45rem;
     font-size: 0.68rem;
@@ -264,6 +282,8 @@
 @media (prefers-reduced-motion: reduce) {
   .day,
   .monthButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     transition: none;
   }
 }

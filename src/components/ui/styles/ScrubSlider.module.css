@@ -1,0 +1,149 @@
+.container {
+  position: relative;
+  width: 100%;
+  height: 2.75rem;
+  border-radius: var(--radius);
+  background: var(--background);
+  /* Heavy inner shadow on top, subtle highlight on bottom to create the "well" effect */
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    inset 0 4px 8px rgba(0, 0, 0, 0.2),
+    0 1px 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  user-select: none;
+  border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.trackContent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+}
+
+.textureNormal, .textureZoomed {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.textureNormal {
+  opacity: 1;
+  /* Knurled/ribbed texture using a repeating linear gradient */
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.03) 4px,
+    rgba(255, 255, 255, 0.03) 5px
+  );
+}
+
+.textureZoomed {
+  opacity: 0;
+  /* American ruler pattern: Unscaled, 1 cycle is 20px. 
+     Uses 0.25px lines so when scaled by 4x, they become 1px crisp lines. */
+  background-image: 
+    linear-gradient(90deg, rgba(255, 255, 255, 0.15) 0.25px, transparent 0.25px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0.25px, transparent 0.25px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0.25px, transparent 0.25px);
+  background-size: 20px 100%, 20px 60%, 10px 40%;
+  background-position: 0 bottom, 10px bottom, 5px bottom;
+  background-repeat: repeat-x;
+}
+
+/* Base swap logic */
+.textureZoomed[data-zoomed="true"] {
+  opacity: 1;
+}
+
+.textureNormal[data-zoomed="true"] {
+  opacity: 0;
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: var(--primary);
+  /* The fill sits over the texture, so we give it some opacity */
+  opacity: 0.25;
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
+
+.hashmarks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  pointer-events: none;
+}
+
+.hashmark {
+  width: 1px;
+  height: 40%;
+  margin-top: 30%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.labels {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 1rem;
+  pointer-events: none; /* Let the container handle drag events */
+}
+
+.labelText {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+/* Re-enable pointer events for the value specific container so we can edit it */
+.valueWrap {
+  pointer-events: none; 
+}
+
+.valueText {
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.valueText:hover,
+.valueText:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+}
+
+.valueInput {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0.25rem;
+  width: 4rem;
+  text-align: right;
+  outline: none;
+}
+
+.valueInput:focus {
+  border-color: var(--primary);
+}

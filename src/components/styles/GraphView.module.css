@@ -1,5 +1,5 @@
 .wrapper {
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface-0);
   box-shadow: var(--shadow-1);
@@ -141,7 +141,7 @@
 }
 
 .simpleGraph {
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 6px;
   overflow: clip;
   background: color-mix(in srgb, var(--surface-1) 55%, var(--surface-0));
@@ -198,7 +198,10 @@
 }
 
 .performanceControls select {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.35rem 0.5rem;
   font-size: 0.82rem;
@@ -262,7 +265,7 @@
 .coverageTable {
   display: grid;
   gap: 0.28rem;
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.45rem;
   overflow-x: auto;
@@ -320,7 +323,7 @@
 }
 
 .balanceCard {
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.45rem;
   display: grid;
@@ -358,7 +361,7 @@
 }
 
 .trendRow {
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.45rem;
   display: grid;
@@ -429,6 +432,9 @@
   }
 
   .performanceControls select {
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
     width: 100%;
   }
 

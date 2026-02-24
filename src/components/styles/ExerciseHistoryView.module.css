@@ -1,5 +1,5 @@
 .root {
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   border-radius: 15px;
   padding: 1.35rem 1.5rem;
   background: var(--surface-0);
@@ -58,7 +58,10 @@
 }
 
 .exerciseFilters select {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--surface-0);
   color: var(--ink-900);
@@ -69,7 +72,7 @@
 
 .clearFilters {
   border-radius: var(--radius-control);
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   background: var(--surface-0);
   color: var(--ink-800);
   padding: 0.46rem 0.72rem;
@@ -89,36 +92,6 @@
   align-items: end;
 }
 
-.addExerciseRow > button {
-  border-radius: 0.35rem;
-  border: 1px solid var(--ink-250);
-  background: var(--surface-1);
-  color: var(--ink-900);
-  padding: 0.72rem 0.88rem;
-  font-size: 0.84rem;
-  cursor: pointer;
-  min-height: 2.2rem;
-  transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease;
-}
-
-.addExerciseRow > button:hover {
-  background: var(--surface-2);
-  border-color: var(--ink-300);
-}
-
-.addExerciseRow > button:focus-visible {
-  outline: 2px solid var(--ink-500);
-  outline-offset: 2px;
-}
-
-.addExerciseRow > button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: var(--surface-1);
-}
-
 @media (max-width: 42rem) {
   .exerciseFilters {
     grid-template-columns: 1fr;
@@ -130,10 +103,6 @@
 
   .addExerciseRow {
     grid-template-columns: 1fr;
-  }
-
-  .addExerciseRow > button {
-    width: 100%;
   }
 }
 
@@ -175,7 +144,7 @@
   font-size: 0.78rem;
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius-control);
-  border: 1px solid var(--ink-220);
+  border: 1px solid transparent;
   background: var(--surface-2);
   color: var(--ink-800);
 }
@@ -189,7 +158,7 @@
 
 .loadMore {
   margin-top: 0.15rem;
-  border: 1px solid var(--ink-220);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--surface-2);
   color: var(--ink-800);
@@ -328,6 +297,8 @@
 }
 
 .detailImageButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   all: unset;
   display: block;
   width: 100%;
@@ -406,7 +377,7 @@
 .detailStatsItem {
   border-radius: 6px;
   padding: 0.9rem;
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   background: var(--surface-0);
   display: flex;
   flex-direction: column;
@@ -438,7 +409,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.18rem;
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.55rem 0.6rem;
   background: var(--surface-0);
@@ -478,7 +449,7 @@
 .muscleChip {
   border-radius: var(--radius-control);
   padding: 0.18rem 0.52rem;
-  border: 1px solid var(--ink-220);
+  border: 1px solid transparent;
   background: color-mix(in oklab, var(--accent-100) 60%, var(--surface-0));
   color: var(--ink-900);
   font-size: 0.74rem;
@@ -487,7 +458,7 @@
 .muscleChipSecondary {
   border-radius: var(--radius-control);
   padding: 0.18rem 0.52rem;
-  border: 1px solid var(--ink-220);
+  border: 1px solid transparent;
   background: color-mix(in oklab, var(--surface-2) 80%, var(--accent-100));
   color: var(--ink-900);
   font-size: 0.74rem;
@@ -496,7 +467,7 @@
 .detailSession {
   padding: 1rem;
   border-radius: 7px;
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   background: var(--surface-0);
   display: flex;
   flex-direction: column;
@@ -544,7 +515,7 @@
   padding: 1rem;
   border-radius: 15px;
   background: var(--surface-0);
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   display: grid;
   gap: 0.5rem;
 }
@@ -646,8 +617,7 @@
     min-height: 2.55rem;
   }
 
-  .addExerciseRow input,
-  .addExerciseRow > button {
+  .addExerciseRow input {
     min-height: 2.55rem;
   }
 
@@ -670,8 +640,7 @@
     flex-direction: column;
   }
 
-  .addExerciseRow input,
-  .addExerciseRow > button {
+  .addExerciseRow input {
     width: 100%;
     min-width: 0;
   }
@@ -706,7 +675,7 @@
   gap: 0.5rem;
   padding: 0.6rem 1rem;
   border-radius: var(--radius-control);
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   background: var(--surface-1);
   color: var(--ink-900);
   text-decoration: none;
@@ -729,7 +698,7 @@
   margin: 0 auto;
   padding: clamp(1.25rem, 2vw, 2.15rem);
   border-radius: 7px;
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   background: var(--surface-1);
   box-shadow: var(--shadow-3);
   color: var(--ink-900);
@@ -743,7 +712,7 @@
   padding: 2rem;
   text-align: center;
   border-radius: 15px;
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   background: var(--surface-1);
 }
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 import { Modal } from "@/components/Modal";
 import { ExerciseDetailImageCarousel } from "@/components/ExerciseDetailImageCarousel";
+import { ScrubSlider } from "@/components/ui/ScrubSlider";
 import { estimateWorkoutCaloriesBurned } from "@/lib/calories";
 import { nowIso } from "@/lib/date";
 import {
@@ -529,39 +530,28 @@ export function GuidedWorkoutView({
         {visibleExercise ? (
           <>
             <div className={styles.repControls}>
-              <button
-                type="button"
-                onClick={() => setReps((value) => Math.max(0, value - 1))}
-              >
-                -
-              </button>
-              <input
-                type="number"
-                min={0}
+              <ScrubSlider
                 value={reps}
-                onChange={(event) => setReps(Number(event.target.value) || 0)}
+                onChange={(val) => setReps(val)}
+                min={0}
+                max={100}
+                step={1}
+                label={copy.guided.reps}
+                formatValue={(val) => val.toString()}
               />
-              <button
-                type="button"
-                onClick={() => setReps((value) => value + 1)}
-              >
-                +
-              </button>
-              <span>{copy.guided.reps}</span>
             </div>
 
-            <label className={styles.weightControl}>
-              {copy.guided.weightForSet}
-              <input
-                type="number"
-                min={0}
-                step={0.5}
+            <div className={styles.weightControl}>
+              <ScrubSlider
                 value={weightKg}
-                onChange={(event) =>
-                  setWeightKg(Number(event.target.value) || 0)
-                }
+                onChange={(val) => setWeightKg(val)}
+                min={0}
+                max={400}
+                step={0.5}
+                label={copy.guided.weightForSet}
+                formatValue={(val) => `${val} kg`}
               />
-            </label>
+            </div>
           </>
         ) : null}
 

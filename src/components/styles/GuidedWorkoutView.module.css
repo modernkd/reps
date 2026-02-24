@@ -1,5 +1,5 @@
 .wrapper {
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface-1) 65%, var(--surface-0));
   box-shadow: var(--shadow-2);
@@ -27,7 +27,7 @@
 }
 
 .abort {
-  border: 1px solid var(--ink-300);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--surface-0);
   padding: 0.35rem 0.75rem;
@@ -37,7 +37,7 @@
 
 .card,
 .timerCard {
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   border-radius: 6px;
   background: var(--surface-0);
   padding: 0.8rem;
@@ -64,14 +64,17 @@
 }
 
 .variantControl input {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
   font-family: inherit;
 }
 
 .referenceCard {
-  border: 1px solid var(--ink-200);
+  border: 1px solid transparent;
   border-radius: 7px;
   padding: 0.45rem;
   margin-bottom: 0.75rem;
@@ -84,7 +87,7 @@
   width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: 6px;
-  border: 1px solid var(--ink-150);
+  border: 1px solid transparent;
   background: color-mix(in srgb, var(--surface-1) 85%, var(--surface-0));
   overflow: hidden;
   display: grid;
@@ -106,6 +109,8 @@
 }
 
 .referenceImageButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   all: unset;
   cursor: pointer;
   border-radius: 6px;
@@ -161,6 +166,8 @@
 }
 
 .uploadButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   justify-self: start;
   border: 1px dashed var(--ink-300);
   border-radius: var(--radius-control);
@@ -171,6 +178,9 @@
 }
 
 .uploadButton input {
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
   display: none;
 }
 
@@ -185,7 +195,7 @@
 .timerActions button,
 .completeSet,
 .finish {
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: 6px;
   background: var(--surface-0);
   padding: 0.45rem 0.7rem;
@@ -194,8 +204,11 @@
 }
 
 .repControls input {
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
   width: 5rem;
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
 }
@@ -214,7 +227,10 @@
 }
 
 .weightControl input {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.4rem 0.5rem;
   width: 8rem;
@@ -260,7 +276,10 @@
 }
 
 .notes textarea {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.5rem 0.65rem;
   font-family: inherit;
@@ -318,7 +337,7 @@
 }
 
 .summaryBack {
-  border: 1px solid var(--ink-300);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--surface-0);
   color: var(--ink-800);
@@ -347,11 +366,17 @@
   }
 
   .repControls input {
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
     width: 100%;
     max-width: 8rem;
   }
 
   .weightControl input {
+  box-shadow: var(--shadow-skeuo-inner);
+  border-color: transparent;
+  background: var(--surface-1);
     width: 100%;
     max-width: 9rem;
   }

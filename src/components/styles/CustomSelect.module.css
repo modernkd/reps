@@ -1,0 +1,94 @@
+.customSelectWrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.customSelectWrapper summary::-webkit-details-marker {
+  display: none;
+}
+
+.customSelectButton {
+  list-style: none; /* fallback for marker hiding */
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 0.42rem 2.05rem 0.42rem 0.72rem;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-skeuo-inner);
+  color: var(--ink-900);
+  font-size: 0.84rem;
+  min-height: 2.35rem; /* fallback for var(--control-height) */
+  line-height: 1.15;
+  min-width: 12.5rem;
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-600) 50%),
+    linear-gradient(135deg, var(--ink-600) 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.92rem) calc(50% - 0.12rem),
+    calc(100% - 0.62rem) calc(50% - 0.12rem);
+  background-size:
+    0.32rem 0.32rem,
+    0.32rem 0.32rem;
+  background-repeat: no-repeat;
+}
+
+.customSelectLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customSelectCaret {
+  display: none;
+}
+
+.customSelectMenu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  border: 1px solid color-mix(in srgb, var(--ink-300) 65%, transparent);
+  border-radius: 0.52rem;
+  background: var(--surface-0);
+  box-shadow: var(--shadow-skeuo-base);
+  padding: 0.25rem;
+  min-width: 100%;
+  display: grid;
+  gap: 0.1rem;
+  z-index: 50;
+}
+
+.selectOptionButton {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink-900);
+  border-radius: 0.36rem;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 0.42rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selectOptionButton:hover {
+  background: var(--surface-1);
+}
+
+.activeCheck {
+  color: var(--accent-600);
+  font-weight: bold;
+}
+
+.customSelectButton:focus-visible,
+.selectOptionButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-500) 45%, transparent);
+  outline-offset: 2px;
+}

@@ -398,6 +398,20 @@ async function getIndexes(): Promise<ExerciseDbIndexes> {
 }
 
 /**
+ * Get exercise by exact ID match
+ */
+export async function getExerciseById(
+  id: string,
+): Promise<ExerciseDbEntry | undefined> {
+  if (!id.trim()) {
+    return undefined;
+  }
+
+  const indexes = await getIndexes();
+  return indexes.byId.get(id);
+}
+
+/**
  * Get exercise by exact or fuzzy name match
  */
 export async function getExerciseByName(

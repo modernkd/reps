@@ -9,24 +9,21 @@ type AppHeaderProps = {
   view: "calendar" | "graph" | "exercises";
   language: AppLanguage;
   greetingName?: string | null;
-  isSignedIn?: boolean;
   templates: Array<{ id: string; name: string }>;
   activeTemplateId?: string;
   onViewChange: (view: "calendar" | "graph" | "exercises") => void;
   onTemplateChange: (templateId: string) => void;
-  onApplyTemplateToCalendar: () => void;
+  onApplyTemplateToCalendar: (templateId: string) => void;
   onOpenCreateTemplate: () => void;
   onOpenEditTemplate: (templateId: string) => void;
   onOpenDuplicateTemplate: (templateId: string) => void;
   onDeleteTemplate: (templateId: string) => void;
-  onOpenAuth: () => void;
 };
 
 export function AppHeader({
   view,
   language,
   greetingName,
-  isSignedIn = false,
   templates,
   activeTemplateId,
   onViewChange,
@@ -36,7 +33,6 @@ export function AppHeader({
   onOpenEditTemplate,
   onOpenDuplicateTemplate,
   onDeleteTemplate,
-  onOpenAuth,
 }: AppHeaderProps) {
   const copy = getCopy(language);
   const canDeleteTemplate = templates.length > 1;
@@ -44,12 +40,16 @@ export function AppHeader({
     (template) => template.id === activeTemplateId,
   );
   const hasTemplates = templates.length > 0;
-  const hasActiveTemplate = Boolean(activeTemplate);
 
   const closeActionMenu = (target: HTMLElement) => {
-    const details = target.closest("details");
-    if (details instanceof HTMLDetailsElement) {
-      details.open = false;
+    const wrapper = target.closest(`.${styles.customSelectWrapper}`);
+    if (wrapper instanceof HTMLDetailsElement) {
+      wrapper.open = false;
+    } else {
+      const details = target.closest("details");
+      if (details instanceof HTMLDetailsElement) {
+        details.open = false;
+      }
     }
   };
 
@@ -105,125 +105,110 @@ export function AppHeader({
             {copy.appHeader.templateLabel}
           </label>
           <div className={styles.templatePickerRow}>
-            <select
-              id="template-select"
-              className={styles.templateSelect}
-              aria-label={copy.appHeader.selectTemplate}
-              value={activeTemplate?.id ?? ""}
-              onChange={(event) => {
-                if (event.target.value) {
-                  onTemplateChange(event.target.value);
-                }
-              }}
-              disabled={!hasTemplates}
-            >
-              {!hasTemplates ? (
-                <option value="">{copy.appHeader.noTemplates}</option>
-              ) : (
-                <>
-                  {!hasActiveTemplate ? (
-                    <option value="" disabled>
-                      {copy.appHeader.selectTemplate}
-                    </option>
-                  ) : null}
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </>
-              )}
-            </select>
-
-            <button
-              type="button"
-              className={styles.newTemplateAction}
-              onClick={onOpenCreateTemplate}
-            >
-              {copy.appHeader.newTemplate}
-            </button>
-
-            <details
-              className={styles.templateActions}
-              data-disabled={!hasActiveTemplate}
-            >
+            <details className={styles.customSelectWrapper}>
               <summary
-                className={styles.meatball}
-                aria-label={copy.appHeader.manageTemplateActions(
-                  activeTemplate?.name ?? copy.appHeader.templateLabel,
-                )}
-                aria-disabled={!hasActiveTemplate}
-                onClick={(event) => {
-                  if (!hasActiveTemplate) {
-                    event.preventDefault();
-                  }
-                }}
+                className={styles.customSelectButton}
+                aria-label={copy.appHeader.selectTemplate}
               >
-                ⋯
+                <span className={styles.customSelectLabel}>
+                  {hasTemplates
+                    ? activeTemplate?.name ?? copy.appHeader.selectTemplate
+                    : copy.appHeader.noTemplates}
+                </span>
+                <span className={styles.customSelectCaret}>▼</span>
               </summary>
+              <div className={styles.customSelectMenu}>
+                {templates.map((template) => (
+                  <div key={template.id} className={styles.templateOptionRow}>
+                    <button
+                      type="button"
+                      className={styles.templateOptionButton}
+                      onClick={(event) => {
+                        onTemplateChange(template.id);
+                        closeActionMenu(event.currentTarget);
+                      }}
+                    >
+                      {template.name}
+                      {template.id === activeTemplateId && (
+                        <span className={styles.activeCheck}>✓</span>
+                      )}
+                    </button>
 
-              <div className={styles.actionsMenu} role="menu">
+                    <details className={styles.templateActions}>
+                      <summary
+                        className={styles.meatball}
+                        aria-label={copy.appHeader.manageTemplateActions(
+                          template.name,
+                        )}
+                      >
+                        ⋯
+                      </summary>
+
+                      <div className={styles.actionsMenu} role="menu">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            onApplyTemplateToCalendar(template.id);
+                            closeActionMenu(event.currentTarget);
+                          }}
+                        >
+                          {copy.appHeader.addTemplateToCalendar}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            onOpenEditTemplate(template.id);
+                            closeActionMenu(event.currentTarget);
+                          }}
+                        >
+                          {copy.appHeader.editTemplate}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            onOpenDuplicateTemplate(template.id);
+                            closeActionMenu(event.currentTarget);
+                          }}
+                        >
+                          {copy.appHeader.duplicateTemplate}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.deleteAction}
+                          disabled={!canDeleteTemplate}
+                          title={
+                            canDeleteTemplate
+                              ? undefined
+                              : copy.appHeader.minTemplatesRequired
+                          }
+                          onClick={(event) => {
+                            onDeleteTemplate(template.id);
+                            closeActionMenu(event.currentTarget);
+                          }}
+                        >
+                          {copy.appHeader.deleteTemplate}
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+                ))}
+
+                {hasTemplates && <hr className={styles.menuDivider} />}
+
                 <button
                   type="button"
-                  disabled={!hasActiveTemplate}
+                  className={styles.newTemplateDropdownAction}
                   onClick={(event) => {
-                    if (!activeTemplate) {
-                      return;
-                    }
-                    onOpenEditTemplate(activeTemplate.id);
+                    onOpenCreateTemplate();
                     closeActionMenu(event.currentTarget);
                   }}
                 >
-                  {copy.appHeader.editTemplate}
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasActiveTemplate}
-                  onClick={(event) => {
-                    if (!activeTemplate) {
-                      return;
-                    }
-                    onOpenDuplicateTemplate(activeTemplate.id);
-                    closeActionMenu(event.currentTarget);
-                  }}
-                >
-                  {copy.appHeader.duplicateTemplate}
-                </button>
-                <button
-                  type="button"
-                  className={styles.deleteAction}
-                  disabled={!canDeleteTemplate || !hasActiveTemplate}
-                  title={
-                    canDeleteTemplate
-                      ? undefined
-                      : copy.appHeader.minTemplatesRequired
-                  }
-                  onClick={(event) => {
-                    if (!activeTemplate) {
-                      return;
-                    }
-                    onDeleteTemplate(activeTemplate.id);
-                    closeActionMenu(event.currentTarget);
-                  }}
-                >
-                  {copy.appHeader.deleteTemplate}
+                  + {copy.appHeader.newTemplate}
                 </button>
               </div>
             </details>
           </div>
         </div>
-
-        <button
-          type="button"
-          className={styles.secondary}
-          onClick={onApplyTemplateToCalendar}
-        >
-          {copy.appHeader.addTemplateToCalendar}
-        </button>
-
-        <button type="button" className={styles.secondary} onClick={onOpenAuth}>
-          {isSignedIn ? copy.appHeader.account : copy.appHeader.login}
-        </button>
       </div>
     </header>
   );

@@ -125,40 +125,7 @@ const exerciseReferenceContentCache = new Map<
   ExerciseReferenceContent
 >();
 
-async function getOrFetchFreeExerciseDb() {
-  if (freeExerciseDbCache) return freeExerciseDbCache;
 
-  const allowTestDbAccess =
-    typeof globalThis !== "undefined" &&
-    (globalThis as { __ALLOW_EXERCISE_DB_IN_TEST__?: boolean })
-      .__ALLOW_EXERCISE_DB_IN_TEST__ === true;
-
-  if (
-    (typeof process !== "undefined" && process.env.NODE_ENV === "test") ||
-    (typeof import.meta !== "undefined" &&
-      (import.meta as { env?: { MODE?: string } }).env?.MODE === "test")
-  ) {
-    if (!allowTestDbAccess) {
-      return null;
-    }
-  }
-
-  try {
-    const response = await fetch(
-      "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/dist/exercises.json",
-    );
-    if (!response.ok) return null;
-    const payload = await response.json();
-    if (!Array.isArray(payload)) {
-      return null;
-    }
-
-    freeExerciseDbCache = payload as FreeExerciseDbEntry[];
-    return freeExerciseDbCache;
-  } catch {
-    return null;
-  }
-}
 
 export async function getFreeExerciseDbExerciseNames(): Promise<string[]> {
   // Delegate to central exerciseDb module
@@ -183,24 +150,7 @@ function resolveExerciseImagePath(path: string): string {
   return buildFreeExerciseImageUrl(trimmed);
 }
 
-function matchFreeExerciseEntry(
-  db: FreeExerciseDbEntry[],
-  exerciseName: string,
-): FreeExerciseDbEntry | undefined {
-  const normalizedSearchName = normalizeExerciseName(exerciseName);
-  if (!normalizedSearchName) {
-    return undefined;
-  }
 
-  return db.find((entry) => {
-    const normalizedEntryName = normalizeExerciseName(entry.name);
-    return (
-      normalizedEntryName === normalizedSearchName ||
-      normalizedEntryName.includes(normalizedSearchName) ||
-      normalizedSearchName.includes(normalizedEntryName)
-    );
-  });
-}
 
 export async function resolveFreeExerciseDbEntry(
   exerciseName: string,
@@ -245,7 +195,9 @@ export async function resolveExerciseReferenceContent(
     };
   }
 
-  const cachedContent = exerciseReferenceContentCache.get(normalizedName);
+  // Cache by ID preferentially if we have it, reducing name thrashing.
+  const cacheKey = normalizedExerciseId || normalizedName;
+  const cachedContent = exerciseReferenceContentCache.get(cacheKey);
   if (cachedContent) {
     return cachedContent;
   }
@@ -264,14 +216,23 @@ export async function resolveExerciseReferenceContent(
         instructions,
       };
 
-      exerciseReferenceContentCache.set(normalizedName, result);
+      exerciseReferenceContentCache.set(cacheKey, result);
       return result;
     }
   }
 
   // Use central exerciseDb module instead of direct DB access
-  const { getExerciseByName } = await import("./exerciseDb");
-  const matchedDbExercise = await getExerciseByName(exerciseName);
+  const { getExerciseByName, getExerciseById } = await import("./exerciseDb");
+  
+  let matchedDbExercise;
+  if (normalizedExerciseId) {
+    matchedDbExercise = await getExerciseById(normalizedExerciseId);
+  }
+  
+  if (!matchedDbExercise && exerciseName) {
+    matchedDbExercise = await getExerciseByName(exerciseName);
+  }
+  
   if (matchedDbExercise) {
     const images =
       matchedDbExercise.images
@@ -319,7 +280,7 @@ export async function resolveExerciseReferenceContent(
           instructions,
         };
 
-        exerciseReferenceContentCache.set(normalizedName, result);
+        exerciseReferenceContentCache.set(cacheKey, result);
         return result;
       }
     }
@@ -335,7 +296,7 @@ export async function resolveExerciseReferenceContent(
     images: [`/images/exercises/${fallbackExerciseId}_0.webp`],
     instructions: [],
   };
-  exerciseReferenceContentCache.set(normalizedName, fallback);
+  exerciseReferenceContentCache.set(cacheKey, fallback);
 
   return fallback;
 }

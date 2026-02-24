@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ImageOff } from "lucide-react";
 
 import styles from "./styles/ExerciseHistoryView.module.css";
 
@@ -25,6 +26,9 @@ export function ExerciseDetailImageCarousel({
 }: ExerciseDetailImageCarouselProps) {
   const [imageIndex, setImageIndex] = useState(0);
   const [isManualMode, setIsManualMode] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
+
   const manualModeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -34,6 +38,8 @@ export function ExerciseDetailImageCarousel({
   useEffect(() => {
     setImageIndex(0);
     setIsManualMode(false);
+    setImageError(false);
+    setImageRetryCount(0);
     if (manualModeTimeoutRef.current) {
       clearTimeout(manualModeTimeoutRef.current);
       manualModeTimeoutRef.current = null;
@@ -54,7 +60,11 @@ export function ExerciseDetailImageCarousel({
     }
 
     const intervalId = setInterval(() => {
-      setImageIndex((previousIndex) => (previousIndex + 1) % images.length);
+      setImageIndex((previousIndex) => {
+        setImageError(false);
+        setImageRetryCount(0);
+        return (previousIndex + 1) % images.length;
+      });
     }, autoplayIntervalMs);
 
     return () => {
@@ -78,7 +88,11 @@ export function ExerciseDetailImageCarousel({
           if (!canCycleImages) {
             return;
           }
-          setImageIndex((previousIndex) => (previousIndex + 1) % images.length);
+          setImageIndex((previousIndex) => {
+            setImageError(false);
+            setImageRetryCount(0);
+            return (previousIndex + 1) % images.length;
+          });
 
           if (autoplayIntervalMs) {
             setIsManualMode(true);
@@ -97,12 +111,36 @@ export function ExerciseDetailImageCarousel({
             : (imageAlt ?? `${exerciseName} image`)
         }
       >
-        <img
-          src={currentImage}
-          alt={imageAlt ?? exerciseName}
-          loading="lazy"
-          style={{ objectFit: imageObjectFit, aspectRatio: imageAspectRatio }}
-        />
+        {imageError ? (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              setImageError(false);
+              setImageRetryCount((c) => c + 1);
+            }}
+            style={{
+              width: "100%",
+              height: "100%",
+              aspectRatio: imageAspectRatio,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--surface-1)",
+              color: "var(--ink-500)",
+            }}
+          >
+            <ImageOff size={48} opacity={0.5} />
+          </div>
+        ) : (
+          <img
+            key={`${currentImage}-${imageRetryCount}`}
+            src={currentImage}
+            alt={imageAlt ?? exerciseName}
+            loading="lazy"
+            style={{ objectFit: imageObjectFit, aspectRatio: imageAspectRatio }}
+            onError={() => setImageError(true)}
+          />
+        )}
       </button>
       {canCycleImages ? (
         <>
@@ -117,3 +155,4 @@ export function ExerciseDetailImageCarousel({
     </div>
   );
 }
+

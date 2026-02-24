@@ -50,11 +50,11 @@ describe("AppHeader", () => {
     expect(props.onViewChange).toHaveBeenCalledWith("exercises");
   });
 
-  it("applies selected template to calendar from action button", () => {
+  it("applies selected template to calendar from action menu", () => {
     const props = renderHeader();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Add template to calendar" }),
+      screen.getAllByRole("button", { name: /Add to calendar/i, hidden: true })[0],
     );
 
     expect(props.onApplyTemplateToCalendar).toHaveBeenCalledTimes(1);
@@ -63,7 +63,7 @@ describe("AppHeader", () => {
   it("opens create-template flow from template dropdown action", () => {
     const props = renderHeader();
 
-    fireEvent.click(screen.getByRole("button", { name: "New template" }));
+    fireEvent.click(screen.getByRole("button", { name: /New template/i, hidden: true }));
 
     expect(props.onOpenCreateTemplate).toHaveBeenCalledTimes(1);
   });
@@ -71,8 +71,7 @@ describe("AppHeader", () => {
   it("opens duplicate-template flow from template dropdown action", () => {
     const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText("Manage Template 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Duplicate template" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Duplicate template", hidden: true })[0]);
 
     expect(props.onOpenDuplicateTemplate).toHaveBeenCalledWith("template-1");
   });
@@ -80,8 +79,7 @@ describe("AppHeader", () => {
   it("opens edit-template flow from template dropdown action", () => {
     const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText("Manage Template 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Edit template" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit template", hidden: true })[0]);
 
     expect(props.onOpenEditTemplate).toHaveBeenCalledWith("template-1");
   });
@@ -89,9 +87,8 @@ describe("AppHeader", () => {
   it("requests delete from template action menu", () => {
     const props = renderHeader();
 
-    fireEvent.click(screen.getByLabelText("Manage Template 1"));
     expect(
-      screen.getByRole("button", { name: "Delete template" }),
+      screen.getAllByRole("button", { name: "Delete template", hidden: true })[0],
     ).toBeDisabled();
 
     expect(props.onDeleteTemplate).not.toHaveBeenCalled();
@@ -105,34 +102,22 @@ describe("AppHeader", () => {
       ],
     });
 
-    fireEvent.click(screen.getByLabelText("Manage Template 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Delete template" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete template", hidden: true })[0]);
 
     expect(props.onDeleteTemplate).toHaveBeenCalledWith("template-1");
   });
 
   it("requests template change when selecting a template id", () => {
-    const props = renderHeader();
-
-    fireEvent.change(screen.getByLabelText("Select template"), {
-      target: { value: "template-1" },
+    const props = renderHeader({
+      templates: [
+        { id: "template-1", name: "Template 1" },
+        { id: "template-2", name: "Template 2" },
+      ],
     });
 
-    expect(props.onTemplateChange).toHaveBeenCalledWith("template-1");
+    fireEvent.click(screen.getByRole("button", { name: "Template 2", hidden: true }));
+
+    expect(props.onTemplateChange).toHaveBeenCalledWith("template-2");
   });
 
-  it("opens auth page from Login button", () => {
-    const props = renderHeader();
-
-    fireEvent.click(screen.getByRole("button", { name: "Login" }));
-
-    expect(props.onOpenAuth).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows account label and greeting when signed in", () => {
-    renderHeader({ isSignedIn: true, greetingName: "Jordan" });
-
-    expect(screen.getByText("Hi, Jordan!")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
-  });
 });

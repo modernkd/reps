@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppLanguage } from "@/lib/i18n";
 import { getCopy, localizeWorkoutTypeName } from "@/lib/i18n";
 import type { Workout, WorkoutIntensity, WorkoutType } from "@/lib/types";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { ScrubSlider } from "@/components/ui/ScrubSlider";
 
-import ElasticSlider from "./ElasticSlider";
 import styles from "./styles/WorkoutForm.module.css";
 
 export type WorkoutFormValue = {
@@ -137,14 +138,17 @@ export function WorkoutForm({
 
       <label>
         {copy.form.type}
-        <select value={type} onChange={(event) => setType(event.target.value)}>
-          <option value="">{copy.form.selectType}</option>
-          {types.map((item) => (
-            <option key={item.id} value={item.id}>
-              {localizeWorkoutTypeName(item, language)}
-            </option>
-          ))}
-        </select>
+        <CustomSelect
+          value={type}
+          onChange={(val) => setType(val)}
+          options={[
+            { value: "", label: copy.form.selectType },
+            ...types.map((item) => ({
+              value: item.id,
+              label: localizeWorkoutTypeName(item, language),
+            })),
+          ]}
+        />
         {errors.type ? (
           <span className={styles.error}>{errors.type}</span>
         ) : null}
@@ -153,17 +157,14 @@ export function WorkoutForm({
       <label>
         {copy.form.duration}
         <div className={styles.sliderField}>
-          <ElasticSlider
+          <ScrubSlider
             value={durationMin}
             onChange={(value) => setDurationMin(value)}
-            startingValue={5}
-            maxValue={300}
-            isStepped
-            stepSize={5}
-            ariaLabel={copy.form.duration}
-            valueFormatter={(value) => `${Math.round(value)} min`}
-            leftIcon={<span aria-hidden>5</span>}
-            rightIcon={<span aria-hidden>300</span>}
+            min={5}
+            max={300}
+            step={5}
+            label={copy.form.duration}
+            formatValue={(value) => `${Math.round(value)} min`}
           />
         </div>
         <input type="hidden" name="durationMin" value={durationMin} readOnly />
@@ -174,12 +175,13 @@ export function WorkoutForm({
 
       <label>
         {copy.form.targetWeight}
-        <input
-          type="number"
-          min={0.1}
+        <ScrubSlider
+          value={targetWeightKg ? Number(targetWeightKg) : 0}
+          onChange={(val) => setTargetWeightKg(val === 0 ? "" : String(val))}
+          min={0}
+          max={200}
           step={0.5}
-          value={targetWeightKg}
-          onChange={(event) => setTargetWeightKg(event.target.value)}
+          formatValue={(val) => val === 0 ? copy.form.notSet : `${val} kg`}
         />
         {errors.targetWeightKg ? (
           <span className={styles.error}>{errors.targetWeightKg}</span>
@@ -188,12 +190,13 @@ export function WorkoutForm({
 
       <label>
         {copy.form.distance}
-        <input
-          type="number"
+        <ScrubSlider
+          value={distanceKm ? Number(distanceKm) : 0}
+          onChange={(val) => setDistanceKm(val === 0 ? "" : String(val))}
           min={0}
+          max={50}
           step={0.1}
-          value={distanceKm}
-          onChange={(event) => setDistanceKm(event.target.value)}
+          formatValue={(val) => val === 0 ? copy.form.notSet : `${val.toFixed(1)} km`}
         />
         {errors.distanceKm ? (
           <span className={styles.error}>{errors.distanceKm}</span>
@@ -202,17 +205,16 @@ export function WorkoutForm({
 
       <label>
         {copy.form.intensity}
-        <select
+        <CustomSelect
           value={intensity}
-          onChange={(event) =>
-            setIntensity(event.target.value as WorkoutIntensity | "")
-          }
-        >
-          <option value="">{copy.form.notSet}</option>
-          <option value="low">{copy.form.low}</option>
-          <option value="medium">{copy.form.medium}</option>
-          <option value="high">{copy.form.high}</option>
-        </select>
+          onChange={(val) => setIntensity(val as WorkoutIntensity | "")}
+          options={[
+            { value: "", label: copy.form.notSet },
+            { value: "low", label: copy.form.low },
+            { value: "medium", label: copy.form.medium },
+            { value: "high", label: copy.form.high },
+          ]}
+        />
       </label>
 
       <label>

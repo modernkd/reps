@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
+import { ImageOff } from "lucide-react";
 
 import type { TemplateDayInput, TemplateExerciseInput } from "@/lib/db";
 import { getCopy, getDateLocale, type AppLanguage } from "@/lib/i18n";
 import type { ExerciseHistoryEntry } from "@/lib/selectors";
 import { useExerciseReferenceContent } from "@/lib/useExerciseReferenceContent";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { ScrubSlider } from "@/components/ui/ScrubSlider";
 
 import { ExerciseSwapInsights } from "./ExerciseSwapInsights";
 import styles from "./styles/TemplateEditor.module.css";
@@ -91,19 +94,6 @@ function defaultDay(): DayState {
   };
 }
 
-function normalizeOptionalPositiveNumber(value: string): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined;
-  }
-
-  return Math.trunc(parsed);
-}
-
 function normalizeExerciseName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -129,6 +119,8 @@ function TemplateExerciseRow({
   const copy = getCopy(language);
   const normalizedName = normalizeExerciseName(exercise.name);
   const [referenceImageIndex, setReferenceImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
   const { content, isLoading } = useExerciseReferenceContent(
     getExerciseIdGuess(exercise.name),
     exercise.name,
@@ -145,6 +137,8 @@ function TemplateExerciseRow({
 
   useEffect(() => {
     setReferenceImageIndex(0);
+    setImageError(false);
+    setImageRetryCount(0);
   }, [exercise.uiId, exercise.name, referenceImages.length]);
 
   const historyWeight =
@@ -204,6 +198,8 @@ function TemplateExerciseRow({
                     return;
                   }
 
+                  setImageError(false);
+                  setImageRetryCount(0);
                   setReferenceImageIndex(
                     (current) => (current + 1) % referenceImages.length,
                   );
@@ -217,12 +213,34 @@ function TemplateExerciseRow({
                     : copy.sessionPlan.referenceImageAlt(exercise.name)
                 }
               >
-                <img
-                  src={activeReferenceImage}
-                  alt={copy.sessionPlan.referenceImageAlt(exercise.name)}
-                  loading="lazy"
-                  className={styles.referenceImage}
-                />
+                {imageError ? (
+                  <div
+                    className={styles.referenceImage}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImageError(false);
+                      setImageRetryCount((c) => c + 1);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--surface-1)",
+                      color: "var(--ink-500)",
+                    }}
+                  >
+                    <ImageOff size={48} opacity={0.5} />
+                  </div>
+                ) : (
+                  <img
+                    key={`${activeReferenceImage}-${imageRetryCount}`}
+                    src={activeReferenceImage}
+                    alt={copy.sessionPlan.referenceImageAlt(exercise.name)}
+                    loading="lazy"
+                    className={styles.referenceImage}
+                    onError={() => setImageError(true)}
+                  />
+                )}
               </button>
               {canCycleReferenceImages ? (
                 <span className={styles.referenceImageStep}>
@@ -249,64 +267,69 @@ function TemplateExerciseRow({
         <div className={styles.cardFieldGrid}>
           <label className={styles.fieldGroup}>
             {copy.templateForm.sets}
-            <input
-              type="number"
-              min={1}
+            <ScrubSlider
               value={exercise.sets}
-              onChange={(event) =>
+              onChange={(val) =>
                 onChange((current) => ({
                   ...current,
-                  sets:
-                    normalizeOptionalPositiveNumber(event.target.value) ?? 1,
+                  sets: val || 1,
                 }))
               }
+              min={1}
+              max={20}
+              step={1}
+              formatValue={(val) => val.toString()}
             />
           </label>
 
           <label className={styles.fieldGroup}>
             {copy.templateForm.minReps}
-            <input
-              type="number"
-              min={1}
-              value={exercise.minReps ?? ""}
-              onChange={(event) =>
+            <ScrubSlider
+              value={exercise.minReps ?? 0}
+              onChange={(val) =>
                 onChange((current) => ({
                   ...current,
-                  minReps: normalizeOptionalPositiveNumber(event.target.value),
+                  minReps: val === 0 ? undefined : val,
                 }))
               }
+              min={0}
+              max={100}
+              step={1}
+              formatValue={(val) => val === 0 ? "-" : val.toString()}
             />
           </label>
 
           <label className={styles.fieldGroup}>
             {copy.templateForm.maxReps}
-            <input
-              type="number"
-              min={1}
-              value={exercise.maxReps ?? ""}
-              onChange={(event) =>
+            <ScrubSlider
+              value={exercise.maxReps ?? 0}
+              onChange={(val) =>
                 onChange((current) => ({
                   ...current,
-                  maxReps: normalizeOptionalPositiveNumber(event.target.value),
+                  maxReps: val === 0 ? undefined : val,
                 }))
               }
+              min={0}
+              max={100}
+              step={1}
+              formatValue={(val) => val === 0 ? "-" : val.toString()}
             />
           </label>
 
           <label className={styles.fieldGroup}>
             {copy.templateForm.restSec}
-            <input
-              type="number"
-              min={15}
-              value={exercise.restSecDefault ?? ""}
-              onChange={(event) =>
+            <ScrubSlider
+              value={exercise.restSecDefault ?? 0}
+              onChange={(val) =>
                 onChange((current) => ({
                   ...current,
-                  restSecDefault: normalizeOptionalPositiveNumber(
-                    event.target.value,
-                  ),
+                  restSecDefault: val === 0 ? undefined : val,
                 }))
               }
+              min={0}
+              max={300}
+              step={5}
+              formatValue={(val) => val === 0 ? "-" : `${val}s`}
             />
           </label>
         </div>
@@ -488,21 +511,19 @@ export function TemplateEditor({
 
             <label>
               {copy.templateForm.weekday}
-              <select
-                value={day.weekday}
-                onChange={(event) =>
+              <CustomSelect
+                value={day.weekday.toString()}
+                onChange={(val) =>
                   updateDay(day.uiId, (current) => ({
                     ...current,
-                    weekday: Number(event.target.value),
+                    weekday: Number(val),
                   }))
                 }
-              >
-                {weekdayOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                options={weekdayOptions.map((option) => ({
+                  value: option.value.toString(),
+                  label: option.label,
+                }))}
+              />
             </label>
           </div>
 

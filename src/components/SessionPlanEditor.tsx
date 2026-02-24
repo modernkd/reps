@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { format, parseISO } from "date-fns";
+import { ImageOff } from "lucide-react";
 
 import {
   readFileAsDataUrl,
@@ -15,6 +16,8 @@ import { useExerciseReferenceContent } from "@/lib/useExerciseReferenceContent";
 import type { SessionPlan } from "@/lib/types";
 import { createId } from "@/lib/ids";
 import type { ExerciseHistoryEntry } from "@/lib/selectors";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+import { ScrubSlider } from "@/components/ui/ScrubSlider";
 
 import { ExerciseSwapInsights } from "./ExerciseSwapInsights";
 import styles from "./styles/SessionPlanEditor.module.css";
@@ -60,6 +63,8 @@ function SessionExerciseRow({
   const listId = exerciseSuggestionListId(exercise.id, index);
   const customExercise = isCustomExerciseVariant(exercise.id, exercise.name);
   const [referenceImageIndex, setReferenceImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetryCount, setImageRetryCount] = useState(0);
   const { content, isLoading } = useExerciseReferenceContent(
     exercise.id,
     exercise.name,
@@ -76,6 +81,8 @@ function SessionExerciseRow({
 
   useEffect(() => {
     setReferenceImageIndex(0);
+    setImageError(false);
+    setImageRetryCount(0);
   }, [exercise.id, exercise.name, imageRefreshKey, referenceImages.length]);
 
   const historyWeight =
@@ -137,7 +144,9 @@ function SessionExerciseRow({
                 if (!canCycleReferenceImages) {
                   return;
                 }
-
+                
+                setImageError(false);
+                setImageRetryCount(0);
                 setReferenceImageIndex(
                   (current) => (current + 1) % referenceImages.length,
                 );
@@ -151,12 +160,34 @@ function SessionExerciseRow({
                   : copy.sessionPlan.referenceImageAlt(exercise.name)
               }
             >
-              <img
-                src={activeReferenceImage}
-                alt={copy.sessionPlan.referenceImageAlt(exercise.name)}
-                loading="lazy"
-                className={styles.referenceImage}
-              />
+              {imageError ? (
+                <div
+                  className={styles.referenceImage}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageError(false);
+                    setImageRetryCount((c) => c + 1);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "var(--surface-1)",
+                    color: "var(--ink-500)",
+                  }}
+                >
+                  <ImageOff size={48} opacity={0.5} />
+                </div>
+              ) : (
+                <img
+                  key={`${activeReferenceImage}-${imageRetryCount}`}
+                  src={activeReferenceImage}
+                  alt={copy.sessionPlan.referenceImageAlt(exercise.name)}
+                  loading="lazy"
+                  className={styles.referenceImage}
+                  onError={() => setImageError(true)}
+                />
+              )}
             </button>
             {canCycleReferenceImages ? (
               <span className={styles.referenceImageStep}>
@@ -201,85 +232,86 @@ function SessionExerciseRow({
       <div className={styles.metricGrid}>
         <label className={styles.metricField}>
           {copy.sessionPlan.sets}
-          <input
-            type="number"
-            min={1}
+          <ScrubSlider
             value={exercise.sets}
-            onChange={(event) =>
+            onChange={(val) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                sets: Number(event.target.value) || 1,
+                sets: val || 1,
               }))
             }
+            min={1}
+            max={20}
+            step={1}
+            formatValue={(val) => val.toString()}
           />
         </label>
 
         <label className={styles.metricField}>
           {copy.sessionPlan.minReps}
-          <input
-            type="number"
-            min={1}
-            value={exercise.minReps ?? ""}
-            onChange={(event) =>
+          <ScrubSlider
+            value={exercise.minReps ?? 0}
+            onChange={(val) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                minReps: event.target.value
-                  ? Number(event.target.value)
-                  : undefined,
+                minReps: val === 0 ? undefined : val,
               }))
             }
+            min={0}
+            max={100}
+            step={1}
+            formatValue={(val) => val === 0 ? "-" : val.toString()}
           />
         </label>
 
         <label className={styles.metricField}>
           {copy.sessionPlan.maxReps}
-          <input
-            type="number"
-            min={1}
-            value={exercise.maxReps ?? ""}
-            onChange={(event) =>
+          <ScrubSlider
+            value={exercise.maxReps ?? 0}
+            onChange={(val) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                maxReps: event.target.value
-                  ? Number(event.target.value)
-                  : undefined,
+                maxReps: val === 0 ? undefined : val,
               }))
             }
+            min={0}
+            max={100}
+            step={1}
+            formatValue={(val) => val === 0 ? "-" : val.toString()}
           />
         </label>
 
         <label className={styles.metricField}>
           {copy.sessionPlan.restSec}
-          <input
-            type="number"
-            min={15}
-            value={exercise.restSecDefault ?? ""}
-            onChange={(event) =>
+          <ScrubSlider
+            value={exercise.restSecDefault ?? 0}
+            onChange={(val) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                restSecDefault: event.target.value
-                  ? Number(event.target.value)
-                  : undefined,
+                restSecDefault: val === 0 ? undefined : val,
               }))
             }
+            min={0}
+            max={300}
+            step={5}
+            formatValue={(val) => val === 0 ? "-" : `${val}s`}
           />
         </label>
 
         <label className={styles.metricField}>
           {copy.sessionPlan.targetMassKg}
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            value={exercise.targetMassKg ?? ""}
-            onChange={(event) =>
+          <ScrubSlider
+            value={exercise.targetMassKg ?? 0}
+            onChange={(val) =>
               onExerciseChange(index, (current) => ({
                 ...current,
-                targetMassKg: event.target.value
-                  ? Number(event.target.value)
-                  : undefined,
+                targetMassKg: val === 0 ? undefined : val,
               }))
             }
+            min={0}
+            max={200}
+            step={0.5}
+            formatValue={(val) => val === 0 ? "-" : `${val}`}
           />
         </label>
       </div>
@@ -436,24 +468,17 @@ export function SessionPlanEditor({
         {exerciseHistory.length > 0 ? (
           <label>
             {copy.sessionPlan.chooseExistingExercise}
-            <select
+            <CustomSelect
               value={selectedExistingExercise}
-              onChange={(event) =>
-                setSelectedExistingExercise(event.target.value)
-              }
-            >
-              <option value="">
-                {copy.sessionPlan.existingExercisePlaceholder}
-              </option>
-              {exerciseHistory.map((entry) => (
-                <option key={entry.name} value={entry.name}>
-                  {entry.name}
-                  {entry.lastWeightKg !== null
-                    ? ` · ${entry.lastWeightKg} kg`
-                    : ""}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setSelectedExistingExercise(val)}
+              options={[
+                { value: "", label: copy.sessionPlan.existingExercisePlaceholder },
+                ...exerciseHistory.map((entry) => ({
+                  value: entry.name,
+                  label: `${entry.name}${entry.lastWeightKg !== null ? ` · ${entry.lastWeightKg} kg` : ""}`,
+                })),
+              ]}
+            />
           </label>
         ) : (
           <p className={styles.historyHint}>{copy.sessionPlan.historyEmpty}</p>

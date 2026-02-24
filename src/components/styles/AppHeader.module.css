@@ -1,9 +1,9 @@
 .wrapper {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 0.8rem;
+  width: 100%;
 }
 
 .kicker {
@@ -15,9 +15,10 @@
 }
 
 .wrapper h1 {
-  margin: 0.2rem 0 0;
-  font-size: clamp(1.6rem, 2vw, 2.15rem);
+  margin: 0;
+  font-size: clamp(1.2rem, 1.5vw, 1.8rem);
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .greeting {
@@ -33,8 +34,9 @@
   --control-radius-inner: calc(var(--radius-control) - 0.14rem);
   display: flex;
   gap: 0.6rem;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 .controls > * {
@@ -42,17 +44,16 @@
 }
 
 .templatePicker {
-  display: grid;
-  gap: 0.28rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.78rem;
   color: var(--ink-600);
-  justify-items: start;
   position: relative;
 }
 
 .templatePicker label {
-  min-height: 1rem;
-  line-height: 1;
+  display: none; /* Hide label to save space in the single row layout */
 }
 
 .templatePickerRow {
@@ -62,19 +63,35 @@
   width: 100%;
 }
 
-.templateSelect {
+.customSelectWrapper {
+  position: relative;
+  display: block;
+  flex: 1;
+  width: 100%;
+}
+
+.customSelectWrapper summary::-webkit-details-marker {
+  display: none;
+}
+
+.customSelectButton {
+  list-style: none; /* fallback for marker hiding */
   appearance: none;
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: var(--control-radius);
   padding: 0.42rem 2.05rem 0.42rem 0.72rem;
-  background: var(--surface-0);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-skeuo-inner);
   color: var(--ink-900);
   font-size: 0.84rem;
   min-height: var(--control-height);
   line-height: 1.15;
   min-width: 12.5rem;
-  flex: 1;
-  cursor: default;
+  width: 100%;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   background-image:
     linear-gradient(45deg, transparent 50%, var(--ink-600) 50%),
     linear-gradient(135deg, var(--ink-600) 50%, transparent 50%);
@@ -87,26 +104,98 @@
   background-repeat: no-repeat;
 }
 
-.templateSelect:disabled {
-  color: var(--ink-600);
-  opacity: 0.8;
-}
-
-.newTemplateAction {
-  border: 1px solid var(--ink-250);
-  border-radius: var(--control-radius);
-  background: var(--surface-0);
-  color: var(--ink-900);
-  font-size: 0.82rem;
-  min-height: var(--control-height);
-  padding: 0.42rem 0.7rem;
-  line-height: 1.1;
-  cursor: pointer;
+.customSelectLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.templateSelect:focus-visible,
-.newTemplateAction:focus-visible,
+.customSelectCaret {
+  display: none;
+}
+
+.customSelectMenu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  border: 1px solid transparent;
+  border-radius: 0.52rem;
+  background: var(--surface-0);
+  box-shadow: var(--shadow-skeuo-base);
+  padding: 0.25rem;
+  min-width: 100%;
+  display: grid;
+  gap: 0.1rem;
+  z-index: 20;
+}
+
+.templateOptionRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+}
+
+.templateOptionButton {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink-900);
+  border-radius: 0.36rem;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 0.42rem 0.5rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.templateOptionButton:hover {
+  background: var(--surface-1);
+}
+
+.activeCheck {
+  color: var(--accent-600);
+  font-weight: bold;
+}
+
+.menuDivider {
+  border: 0;
+  border-top: 1px solid var(--ink-200);
+  margin: 0.25rem 0;
+}
+
+.newTemplateDropdownAction {
+  border: 0;
+  background: transparent;
+  color: var(--ink-900);
+  border-radius: 0.36rem;
+  text-align: left;
+  font-size: 0.8rem;
+  padding: 0.42rem 0.5rem;
+  cursor: pointer;
+}
+
+.newTemplateDropdownAction:hover {
+  background: var(--surface-1);
+}
+
+.templateOptionRow .templateActions {
+  display: flex;
+  align-items: center;
+}
+
+.templateOptionRow .meatball {
+  width: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.customSelectButton:focus-visible,
+.newTemplateDropdownAction:focus-visible,
+.templateOptionButton:focus-visible,
 .meatball:focus-visible,
 .actionsMenu button:focus-visible,
 .toggle button:focus-visible,
@@ -130,13 +219,13 @@
 }
 
 .meatball {
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: var(--control-radius);
   background: transparent;
   color: var(--ink-700);
   width: var(--control-height);
   min-width: var(--control-height);
-  min-height: var(--control-height);
+  min-height: calc(var(--control-height) - 0.5rem);
   cursor: pointer;
   display: flex;
   justify-content: center;
@@ -152,10 +241,10 @@
   position: absolute;
   top: calc(100% + 0.35rem);
   right: 0;
-  border: 1px solid var(--ink-250);
+  border: 1px solid color-mix(in srgb, var(--ink-300) 65%, transparent);
   border-radius: 0.52rem;
   background: var(--surface-0);
-  box-shadow: 0 10px 22px rgba(10, 16, 28, 0.17);
+  box-shadow: var(--shadow-skeuo-base);
   padding: 0.25rem;
   min-width: 9rem;
   display: grid;
@@ -196,7 +285,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   width: min(18rem, 100%);
   max-width: 100%;
-  border: 1px solid var(--ink-250);
+  border: 1px solid transparent;
   border-radius: var(--control-radius);
   padding: 0.16rem;
   background: var(--surface-0);
@@ -226,6 +315,8 @@
 
 .primary,
 .secondary {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   border-radius: var(--control-radius);
   padding: 0.48rem 0.85rem;
   font-size: 0.84rem;
@@ -239,20 +330,25 @@
 }
 
 .primary {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   border: 1px solid transparent;
   background: var(--accent-600);
   color: #fff;
 }
 
 .secondary {
-  border: 1px solid var(--ink-250);
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
+  border: 1px solid transparent;
   background: var(--surface-0);
   color: var(--ink-900);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .wrapper {
     align-items: flex-start;
+    flex-direction: column;
     gap: 0.65rem;
   }
 
@@ -266,6 +362,7 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     align-items: flex-start;
+    justify-content: flex-start;
   }
 
   .controls > * {
@@ -285,18 +382,23 @@
     width: 100%;
   }
 
-  .templateSelect {
+  .customSelectWrapper {
     width: 100%;
     min-width: 0;
+  }
+
+  .customSelectButton {
     min-height: 2.6rem;
   }
 
-  .newTemplateAction {
+  .newTemplateDropdownAction {
     min-height: 2.6rem;
   }
 
   .primary,
   .secondary {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     width: 100%;
     min-height: 2.6rem;
     padding: 0.58rem 0.8rem;
@@ -321,7 +423,7 @@
     align-items: stretch;
   }
 
-  .templateSelect {
+  .customSelectWrapper {
     width: 100%;
     grid-column: 1 / -1;
   }
@@ -332,7 +434,7 @@
     min-height: 2.3rem;
   }
 
-  .newTemplateAction {
+  .newTemplateDropdownAction {
     min-height: 2.3rem;
   }
 
@@ -355,6 +457,8 @@
 
   .primary,
   .secondary {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     width: 100%;
     text-align: center;
   }
@@ -366,6 +470,8 @@
   }
 
   .primary {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
     position: fixed;
     left: 0.75rem;
     right: 0.75rem;
@@ -375,3 +481,5 @@
     box-shadow: 0 14px 28px -18px rgba(0, 0, 0, 0.55);
   }
 }
+
+.primary:active, .secondary:active { box-shadow: var(--shadow-skeuo-inner); transform: translateY(1px); }

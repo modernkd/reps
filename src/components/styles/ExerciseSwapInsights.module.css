@@ -1,5 +1,5 @@
 .root {
-  border: 1px solid var(--ink-180);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0.65rem;
   background: color-mix(in srgb, var(--surface-0) 88%, var(--surface-1));
@@ -14,7 +14,7 @@
 }
 
 .swapBlock {
-  border: 1px solid var(--ink-160);
+  border: 1px solid transparent;
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface-0) 94%, var(--surface-1));
   padding: 0.48rem;
@@ -44,8 +44,10 @@
 }
 
 .optionButton {
+  box-shadow: var(--shadow-skeuo-base);
+  border-color: transparent;
   width: 100%;
-  border: 1px solid var(--ink-220);
+  border: 1px solid transparent;
   border-radius: 6px;
   background: var(--surface-0);
   color: var(--ink-900);

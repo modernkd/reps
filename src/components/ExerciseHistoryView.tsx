@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { format, parseISO } from "date-fns";
 
 import { ChromaGrid } from "./ChromaGrid";
 import { ExerciseTypeahead } from "./ExerciseTypeahead";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import styles from "./styles/ExerciseHistoryView.module.css";
 import { resolveExerciseReferenceContent } from "@/lib/exerciseImages";
 import { resolveFreeExerciseDbEntry } from "@/lib/exerciseImages";
@@ -20,6 +21,16 @@ const INITIAL_VISIBLE_LOGS = 3;
 const LOAD_MORE_STEP = 3;
 const MAX_WEIGHT_POINTS = 10;
 const FALLBACK_IMAGE = "/images/exercises/ex_bench_press_0.webp";
+type ExerciseMetadata = Pick<
+  FreeExerciseDbEntry,
+  | "category"
+  | "equipment"
+  | "force"
+  | "level"
+  | "mechanic"
+  | "primaryMuscles"
+  | "secondaryMuscles"
+>;
 
 export type ExerciseViewFilters = {
   muscle?: string;
@@ -42,6 +53,42 @@ type TimelinePoint = {
   date: string;
   value: number;
 };
+
+function normalizeFilterValue(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+export function matchesExerciseSearch(input: {
+  searchFilter?: string;
+  entryName: string;
+  metadata?: ExerciseMetadata;
+}): boolean {
+  if (!input.searchFilter) {
+    return true;
+  }
+
+  const normalizedSearch = normalizeFilterValue(input.searchFilter);
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  const nameMatches = Boolean(
+    normalizeFilterValue(input.entryName)?.includes(normalizedSearch),
+  );
+  const muscleMatches = [
+    ...(input.metadata?.primaryMuscles ?? []),
+    ...(input.metadata?.secondaryMuscles ?? []),
+  ].some((muscle) =>
+    normalizeFilterValue(muscle)?.includes(normalizedSearch),
+  );
+
+  return nameMatches || muscleMatches;
+}
 
 function WeightSparkline({ points }: { points: TimelinePoint[] }) {
   if (points.length < 2) {
@@ -154,16 +201,7 @@ export function ExerciseHistoryView({
       {
         images: string[];
         instructions: string[];
-        metadata?: Pick<
-          FreeExerciseDbEntry,
-          | "category"
-          | "equipment"
-          | "force"
-          | "level"
-          | "mechanic"
-          | "primaryMuscles"
-          | "secondaryMuscles"
-        >;
+        metadata?: ExerciseMetadata;
       }
     >
   >({});
@@ -280,16 +318,7 @@ export function ExerciseHistoryView({
         {
           images: string[];
           instructions: string[];
-          metadata?: Pick<
-            FreeExerciseDbEntry,
-            | "category"
-            | "equipment"
-            | "force"
-            | "level"
-            | "mechanic"
-            | "primaryMuscles"
-            | "secondaryMuscles"
-          >;
+          metadata?: ExerciseMetadata;
         }
       > = {};
       for (const [entryKey, content, dbEntry] of pairs) {
@@ -340,20 +369,6 @@ export function ExerciseHistoryView({
     }
   };
 
-  const handleSubmitExercise = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    await addExerciseByName(newExerciseName);
-  };
-
-  const normalizeValue = (value?: string): string | undefined => {
-    if (!value) {
-      return undefined;
-    }
-
-    const normalized = value.trim().toLowerCase();
-    return normalized.length > 0 ? normalized : undefined;
-  };
-
   const hasActiveFilters = Boolean(
     selectedFilters.muscle ||
     selectedFilters.equipment ||
@@ -362,17 +377,28 @@ export function ExerciseHistoryView({
   );
 
   const filteredEntries = useMemo(() => {
-    const selectedMuscle = normalizeValue(selectedFilters.muscle);
-    const selectedEquipment = normalizeValue(selectedFilters.equipment);
-    const selectedDifficulty = normalizeValue(selectedFilters.difficulty);
-    const selectedCategory = normalizeValue(selectedFilters.category);
+    const selectedMuscle = normalizeFilterValue(selectedFilters.muscle);
+    const selectedEquipment = normalizeFilterValue(selectedFilters.equipment);
+    const selectedDifficulty = normalizeFilterValue(selectedFilters.difficulty);
+    const selectedCategory = normalizeFilterValue(selectedFilters.category);
+    const searchFilter = normalizeFilterValue(newExerciseName);
 
     return entries.filter((entry) => {
+      const metadata = referenceContentByExercise[entry.key]?.metadata;
+      if (
+        !matchesExerciseSearch({
+          searchFilter,
+          entryName: entry.name,
+          metadata,
+        })
+      ) {
+        return false;
+      }
+
       if (!hasActiveFilters) {
         return true;
       }
 
-      const metadata = referenceContentByExercise[entry.key]?.metadata;
       if (!metadata) {
         return false;
       }
@@ -382,7 +408,7 @@ export function ExerciseHistoryView({
           ...(metadata.primaryMuscles ?? []),
           ...(metadata.secondaryMuscles ?? []),
         ]
-          .map((value) => normalizeValue(value))
+          .map((value) => normalizeFilterValue(value))
           .filter((value): value is string => Boolean(value));
 
         if (!allMuscles.includes(selectedMuscle)) {
@@ -392,28 +418,34 @@ export function ExerciseHistoryView({
 
       if (
         selectedEquipment &&
-        normalizeValue(metadata.equipment) !== selectedEquipment
+        normalizeFilterValue(metadata.equipment) !== selectedEquipment
       ) {
         return false;
       }
 
       if (
         selectedDifficulty &&
-        normalizeValue(metadata.level) !== selectedDifficulty
+        normalizeFilterValue(metadata.level) !== selectedDifficulty
       ) {
         return false;
       }
 
       if (
         selectedCategory &&
-        normalizeValue(metadata.category) !== selectedCategory
+        normalizeFilterValue(metadata.category) !== selectedCategory
       ) {
         return false;
       }
 
       return true;
     });
-  }, [entries, hasActiveFilters, referenceContentByExercise, selectedFilters]);
+  }, [
+    entries,
+    hasActiveFilters,
+    newExerciseName,
+    referenceContentByExercise,
+    selectedFilters,
+  ]);
 
   const formatFilterOptionLabel = (value: string): string =>
     value.replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
@@ -422,82 +454,82 @@ export function ExerciseHistoryView({
     <div className={styles.exerciseFilters}>
       <label>
         {copy.historyView.filterMuscle}
-        <select
+        <CustomSelect
           value={selectedFilters.muscle ?? ""}
-          onChange={(event) =>
+          onChange={(val) =>
             onFiltersChange({
               ...selectedFilters,
-              muscle: event.target.value || undefined,
+              muscle: val || undefined,
             })
           }
-        >
-          <option value="">{copy.historyView.filterAny}</option>
-          {filterOptions.muscles.map((option) => (
-            <option key={option} value={option}>
-              {formatFilterOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: copy.historyView.filterAny },
+            ...filterOptions.muscles.map((option) => ({
+              value: option,
+              label: formatFilterOptionLabel(option),
+            })),
+          ]}
+        />
       </label>
 
       <label>
         {copy.historyView.filterEquipment}
-        <select
+        <CustomSelect
           value={selectedFilters.equipment ?? ""}
-          onChange={(event) =>
+          onChange={(val) =>
             onFiltersChange({
               ...selectedFilters,
-              equipment: event.target.value || undefined,
+              equipment: val || undefined,
             })
           }
-        >
-          <option value="">{copy.historyView.filterAny}</option>
-          {filterOptions.equipment.map((option) => (
-            <option key={option} value={option}>
-              {formatFilterOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: copy.historyView.filterAny },
+            ...filterOptions.equipment.map((option) => ({
+              value: option,
+              label: formatFilterOptionLabel(option),
+            })),
+          ]}
+        />
       </label>
 
       <label>
         {copy.historyView.filterDifficulty}
-        <select
+        <CustomSelect
           value={selectedFilters.difficulty ?? ""}
-          onChange={(event) =>
+          onChange={(val) =>
             onFiltersChange({
               ...selectedFilters,
-              difficulty: event.target.value || undefined,
+              difficulty: val || undefined,
             })
           }
-        >
-          <option value="">{copy.historyView.filterAny}</option>
-          {filterOptions.difficulty.map((option) => (
-            <option key={option} value={option}>
-              {formatFilterOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: copy.historyView.filterAny },
+            ...filterOptions.difficulty.map((option) => ({
+              value: option,
+              label: formatFilterOptionLabel(option),
+            })),
+          ]}
+        />
       </label>
 
       <label>
         {copy.historyView.filterCategory}
-        <select
+        <CustomSelect
           value={selectedFilters.category ?? ""}
-          onChange={(event) =>
+          onChange={(val) =>
             onFiltersChange({
               ...selectedFilters,
-              category: event.target.value || undefined,
+              category: val || undefined,
             })
           }
-        >
-          <option value="">{copy.historyView.filterAny}</option>
-          {filterOptions.categories.map((option) => (
-            <option key={option} value={option}>
-              {formatFilterOptionLabel(option)}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: copy.historyView.filterAny },
+            ...filterOptions.categories.map((option) => ({
+              value: option,
+              label: formatFilterOptionLabel(option),
+            })),
+          ]}
+        />
       </label>
 
       <button
@@ -519,7 +551,7 @@ export function ExerciseHistoryView({
   );
 
   const renderAddExerciseForm = () => (
-    <form className={styles.addExerciseForm} onSubmit={handleSubmitExercise}>
+    <div className={styles.addExerciseForm}>
       <div className={styles.addExerciseRow}>
         <ExerciseTypeahead
           id="new-exercise-input"
@@ -531,17 +563,13 @@ export function ExerciseHistoryView({
           onSuggestionSelect={(suggestion) => {
             void addExerciseByName(suggestion);
           }}
+          onCreate={(val) => {
+            void addExerciseByName(val);
+          }}
+          formatCreateLabel={(val) => `Add "${val}"`}
         />
-        <button
-          type="submit"
-          disabled={isAddingExercise || newExerciseName.trim().length === 0}
-        >
-          {isAddingExercise
-            ? copy.historyView.addingExercise
-            : copy.historyView.addExercise}
-        </button>
       </div>
-    </form>
+    </div>
   );
 
   if (!entries.length) {

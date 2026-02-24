@@ -18,6 +18,7 @@ import { format, parseISO } from "date-fns";
 import gsap from "gsap";
 
 import type { AppLanguage } from "@/lib/i18n";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { getCopy, getDateLocale, localizeWorkoutTypeName } from "@/lib/i18n";
 import {
   getExerciseInsights,
@@ -371,14 +372,6 @@ export function GraphView({
       : copy.graph.ySpeed
     : copy.graph.yStrength;
 
-  const performanceTitle = isRunLike
-    ? runMetric === "pace"
-      ? copy.graph.runPaceProgress
-      : copy.graph.runSpeedProgress
-    : selectedExercise
-      ? `${selectedExercise} ${copy.graph.exerciseProgressSuffix}`
-      : copy.graph.exerciseProgress;
-
   const weightTrendData = useMemo(
     () =>
       weightPoints.map((point) => ({
@@ -666,44 +659,41 @@ export function GraphView({
           <div className={styles.performanceControls}>
             <label>
               {copy.graph.type}
-              <select
+              <CustomSelect
                 value={focusTypeId}
-                onChange={(event) => setFocusTypeId(event.target.value)}
-              >
-                {typeOptions.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {localizeWorkoutTypeName(type, language)}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setFocusTypeId(val)}
+                options={typeOptions.map((type) => ({
+                  value: type.id,
+                  label: localizeWorkoutTypeName(type, language),
+                }))}
+              />
             </label>
 
             {isRunLike ? (
               <label>
                 {copy.graph.metric}
-                <select
+                <CustomSelect
                   value={runMetric}
-                  onChange={(event) =>
-                    setRunMetric(event.target.value as "pace" | "speed")
+                  onChange={(val) =>
+                    setRunMetric(val as "pace" | "speed")
                   }
-                >
-                  <option value="pace">{copy.graph.pace}</option>
-                  <option value="speed">{copy.graph.speed}</option>
-                </select>
+                  options={[
+                    { value: "pace", label: copy.graph.pace },
+                    { value: "speed", label: copy.graph.speed },
+                  ]}
+                />
               </label>
             ) : (
               <label>
                 {copy.graph.exercise}
-                <select
+                <CustomSelect
                   value={selectedExercise}
-                  onChange={(event) => setSelectedExercise(event.target.value)}
-                >
-                  {strengthExerciseNames.map((exerciseName) => (
-                    <option key={exerciseName} value={exerciseName}>
-                      {exerciseName}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedExercise(val)}
+                  options={strengthExerciseNames.map((exerciseName) => ({
+                    value: exerciseName,
+                    label: exerciseName,
+                  }))}
+                />
               </label>
             )}
           </div>

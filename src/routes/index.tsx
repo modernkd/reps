@@ -16,6 +16,7 @@ import {
 import { GraphView } from "@/components/GraphView";
 import { GuidedWorkoutView } from "@/components/GuidedWorkoutView";
 import { Modal } from "@/components/Modal";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { SessionPlanEditor } from "@/components/SessionPlanEditor";
 import {
   TemplateEditor,
@@ -829,17 +830,29 @@ function WorkoutDashboard() {
     }));
   };
 
-  const handleOpenApplyTemplate = () => {
-    if (activeTemplateDays.length === 0) {
+  const handleOpenApplyTemplate = (templateId: string) => {
+    const templateDays = planDays
+      .filter((day) => day.templateId === templateId)
+      .sort((a, b) => a.weekday - b.weekday);
+
+    if (templateDays.length === 0) {
       setErrorMessage(copy.route.failedGenerateSessions);
       return;
     }
 
     const selectedWeekday = ((parseISO(selectedDate).getDay() + 6) % 7) + 1;
     const preferredDay =
-      activeTemplateDays.find((day) => day.weekday === selectedWeekday) ??
-      activeTemplateDays[0];
+      templateDays.find((day) => day.weekday === selectedWeekday) ??
+      templateDays[0];
 
+    // Note: applyTemplateModalState only tracks startPlanDayId, 
+    // it implicitly uses activeTemplateId for the actual application logic
+    // we need to set the activeTemplateId first before opening the modal
+    // so the modal knows what to apply
+    if (activeTemplateId !== templateId) {
+       handleTemplateChange(templateId);
+    }
+    
     setApplyTemplateModalState({
       startPlanDayId: preferredDay!.id,
     });
@@ -1454,7 +1467,6 @@ function WorkoutDashboard() {
             view={view}
             language={language}
             greetingName={greetingName}
-            isSignedIn={Boolean(cloudUser)}
             templates={templates.map((template) => ({
               id: template.id,
               name: template.name,
@@ -1467,17 +1479,6 @@ function WorkoutDashboard() {
             onOpenEditTemplate={handleOpenEditTemplate}
             onOpenDuplicateTemplate={handleOpenDuplicateTemplate}
             onDeleteTemplate={handleDeleteTemplate}
-            onOpenAuth={() =>
-              navigate({
-                to: "/auth",
-                search: {
-                  redirect:
-                    typeof window === "undefined"
-                      ? "/"
-                      : `${window.location.pathname}${window.location.search}`,
-                },
-              })
-            }
           />
         ) : null}
 
@@ -1616,8 +1617,20 @@ function WorkoutDashboard() {
         <AppFooterControls
           language={language}
           theme={theme}
+          isSignedIn={Boolean(cloudUser)}
           onLanguageChange={setLanguage}
           onToggleTheme={handleToggleTheme}
+          onOpenAuth={() =>
+            navigate({
+              to: "/auth",
+              search: {
+                redirect:
+                  typeof window === "undefined"
+                    ? "/"
+                    : `${window.location.pathname}${window.location.search}`,
+              },
+            })
+          }
         />
       ) : null}
 
@@ -1658,25 +1671,23 @@ function WorkoutDashboard() {
             <p>{copy.route.applyTemplateHelp(selectedDate)}</p>
             <label>
               {copy.route.applyTemplateStartDayLabel}
-              <select
+              <CustomSelect
                 value={applyTemplateModalState.startPlanDayId}
-                onChange={(event) =>
+                onChange={(val) =>
                   setApplyTemplateModalState((current) =>
                     current
                       ? {
                           ...current,
-                          startPlanDayId: event.target.value,
+                          startPlanDayId: val,
                         }
                       : current,
                   )
                 }
-              >
-                {applyTemplateDayOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label} ({option.weekdayLabel})
-                  </option>
-                ))}
-              </select>
+                options={applyTemplateDayOptions.map((option) => ({
+                  value: option.id,
+                  label: `${option.label} (${option.weekdayLabel})`,
+                }))}
+              />
             </label>
             <div>
               <button
@@ -1710,25 +1721,23 @@ function WorkoutDashboard() {
             templates.length > 0 ? (
               <label>
                 {copy.templateForm.selectDuplicateSource}
-                <select
+                <CustomSelect
                   value={templateModalState.sourceTemplateId ?? ""}
-                  onChange={(event) =>
+                  onChange={(val) =>
                     setTemplateModalState((current) =>
                       current && current.mode === "duplicate"
                         ? {
                             ...current,
-                            sourceTemplateId: event.target.value || undefined,
+                            sourceTemplateId: val || undefined,
                           }
                         : current,
                     )
                   }
-                >
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
+                  options={templates.map((template) => ({
+                    value: template.id,
+                    label: template.name,
+                  }))}
+                />
               </label>
             ) : null}
 

@@ -67,13 +67,16 @@
   --shadow-1: 0 12px 25px -18px rgba(17, 24, 39, 0.28);
   --shadow-2: 0 20px 40px -26px rgba(15, 23, 42, 0.34);
   --shadow-3: 0 28px 52px -30px rgba(15, 23, 42, 0.42);
+  --shadow-skeuo-base: 6px 6px 12px color-mix(in oklch, var(--color-slate-4) 70%, transparent), -6px -6px 12px color-mix(in oklch, white 90%, transparent);
+  --shadow-skeuo-sm: 3px 3px 6px color-mix(in oklch, var(--color-slate-4) 70%, transparent), -3px -3px 6px color-mix(in oklch, white 90%, transparent);
+  --shadow-skeuo-inner: inset 4px 4px 8px color-mix(in oklch, var(--color-slate-4) 80%, transparent), inset -4px -4px 8px color-mix(in oklch, white 80%, transparent);
   --radius: 0.5rem;
   --radius-control: 0.56rem;
   --background: var(--surface-1);
   --foreground: var(--ink-900);
-  --card: var(--surface-0);
+  --card: var(--surface-1);
   --card-foreground: var(--ink-900);
-  --popover: var(--surface-0);
+  --popover: var(--surface-1);
   --popover-foreground: var(--ink-900);
   --primary: var(--accent-600);
   --primary-foreground: var(--surface-0);
@@ -160,11 +163,14 @@
   --shadow-1: 0 12px 25px -18px rgba(0, 0, 0, 0.7);
   --shadow-2: 0 20px 40px -26px rgba(0, 0, 0, 0.8);
   --shadow-3: 0 28px 52px -30px rgba(0, 0, 0, 0.85);
+  --shadow-skeuo-base: 6px 6px 12px oklch(0% 0 0 / 0.6), -6px -6px 12px color-mix(in oklch, var(--color-slate-4) 40%, transparent);
+  --shadow-skeuo-sm: 3px 3px 6px oklch(0% 0 0 / 0.6), -3px -3px 6px color-mix(in oklch, var(--color-slate-4) 40%, transparent);
+  --shadow-skeuo-inner: inset 3px 3px 6px oklch(0% 0 0 / 0.4), inset -3px -3px 6px color-mix(in oklch, var(--color-slate-3) 20%, transparent);
   --background: var(--surface-1);
   --foreground: var(--ink-900);
-  --card: var(--surface-0);
+  --card: var(--surface-1);
   --card-foreground: var(--ink-900);
-  --popover: var(--surface-0);
+  --popover: var(--surface-1);
   --popover-foreground: var(--ink-900);
   --primary: var(--accent-600);
   --primary-foreground: var(--ink-950);
@@ -255,6 +261,9 @@ a {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --shadow-skeuo-base: var(--shadow-skeuo-base);
+  --shadow-skeuo-sm: var(--shadow-skeuo-sm);
+  --shadow-skeuo-inner: var(--shadow-skeuo-inner);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -273,9 +282,9 @@ a {
 .dark {
   --background: var(--surface-1);
   --foreground: var(--ink-900);
-  --card: var(--surface-0);
+  --card: var(--surface-1);
   --card-foreground: var(--ink-900);
-  --popover: var(--surface-0);
+  --popover: var(--surface-1);
   --popover-foreground: var(--ink-900);
   --primary: var(--accent-600);
   --primary-foreground: var(--ink-950);

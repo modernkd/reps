@@ -14,10 +14,19 @@ type ExerciseTypeaheadProps = {
   onSuggestionSelect?: (value: string) => void;
   searchMode?: "simple" | "enhanced";
   onEnhancedSearch?: (query: string) => string[];
+  onCreate?: (value: string) => void;
+  formatCreateLabel?: (value: string) => string;
 };
 
 function normalizeQuery(value: string): string {
   return value.trim().toLowerCase();
+}
+
+export function shouldBlurTypeaheadOnEnter(input: {
+  key: string;
+  activeIndex: number;
+}): boolean {
+  return input.key === "Enter" && input.activeIndex === -1;
 }
 
 export function ExerciseTypeahead({
@@ -30,6 +39,8 @@ export function ExerciseTypeahead({
   onSuggestionSelect,
   searchMode = "simple",
   onEnhancedSearch,
+  onCreate,
+  formatCreateLabel,
 }: ExerciseTypeaheadProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -93,6 +104,17 @@ export function ExerciseTypeahead({
     return next;
   }, [normalizedValue, suggestions, enhancedResults, searchMode]);
 
+  const hasExactMatch = useMemo(
+    () => filteredSuggestions.some((s) => normalizeQuery(s) === normalizedValue),
+    [filteredSuggestions, normalizedValue]
+  );
+
+  const showCreateOption = Boolean(
+    onCreate && normalizedValue && !hasExactMatch
+  );
+
+  const totalOptionsCount = filteredSuggestions.length + (showCreateOption ? 1 : 0);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -114,21 +136,21 @@ export function ExerciseTypeahead({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!filteredSuggestions.length) {
+    if (totalOptionsCount === 0) {
       setActiveIndex(-1);
       return;
     }
 
     setActiveIndex((current) =>
-      current < filteredSuggestions.length
+      current < totalOptionsCount
         ? current
-        : filteredSuggestions.length - 1,
+        : totalOptionsCount - 1,
     );
-  }, [filteredSuggestions]);
+  }, [totalOptionsCount]);
 
-  const isListVisible = isOpen && filteredSuggestions.length > 0;
+  const isListVisible = isOpen && totalOptionsCount > 0;
   const activeOptionId =
-    activeIndex >= 0 && activeIndex < filteredSuggestions.length
+    activeIndex >= 0 && activeIndex < totalOptionsCount
       ? `${listboxId}-option-${activeIndex}`
       : undefined;
 
@@ -154,6 +176,14 @@ export function ExerciseTypeahead({
           aria-controls={isListVisible ? listboxId : undefined}
           aria-activedescendant={isListVisible ? activeOptionId : undefined}
           onKeyDown={(event) => {
+            if (shouldBlurTypeaheadOnEnter({ key: event.key, activeIndex })) {
+              event.preventDefault();
+              event.currentTarget.blur();
+              setIsOpen(false);
+              setActiveIndex(-1);
+              return;
+            }
+
             if (!isListVisible) {
               return;
             }
@@ -164,7 +194,7 @@ export function ExerciseTypeahead({
                 if (current < 0) {
                   return 0;
                 }
-                return (current + 1) % filteredSuggestions.length;
+                return (current + 1) % totalOptionsCount;
               });
               return;
             }
@@ -173,7 +203,7 @@ export function ExerciseTypeahead({
               event.preventDefault();
               setActiveIndex((current) => {
                 if (current <= 0) {
-                  return filteredSuggestions.length - 1;
+                  return totalOptionsCount - 1;
                 }
                 return current - 1;
               });
@@ -182,10 +212,16 @@ export function ExerciseTypeahead({
 
             if (event.key === "Enter" && activeIndex >= 0) {
               event.preventDefault();
-              const selectedSuggestion = filteredSuggestions[activeIndex];
-              if (selectedSuggestion) {
-                onChange(selectedSuggestion);
-                onSuggestionSelect?.(selectedSuggestion);
+              if (activeIndex < filteredSuggestions.length) {
+                const selectedSuggestion = filteredSuggestions[activeIndex];
+                if (selectedSuggestion) {
+                  onChange(selectedSuggestion);
+                  onSuggestionSelect?.(selectedSuggestion);
+                  setIsOpen(false);
+                  setActiveIndex(-1);
+                }
+              } else if (showCreateOption) {
+                onCreate?.(value);
                 setIsOpen(false);
                 setActiveIndex(-1);
               }
@@ -232,6 +268,34 @@ export function ExerciseTypeahead({
                 </li>
               );
             })}
+            
+            {showCreateOption ? (
+              <li
+                id={`${listboxId}-option-${filteredSuggestions.length}`}
+                role="option"
+                aria-selected={activeIndex === filteredSuggestions.length}
+                className={
+                  activeIndex === filteredSuggestions.length
+                    ? `${styles.option} ${styles.optionActive}`
+                    : styles.option
+                }
+              >
+                <button
+                  type="button"
+                  onMouseEnter={() => setActiveIndex(filteredSuggestions.length)}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onCreate?.(value);
+                    setIsOpen(false);
+                    setActiveIndex(-1);
+                  }}
+                  className={styles.createButton}
+                >
+                  <span className={styles.createIcon}>+</span>
+                  {formatCreateLabel ? formatCreateLabel(value) : `Add "${value}"`}
+                </button>
+              </li>
+            ) : null}
           </ul>
         ) : null}
       </div>

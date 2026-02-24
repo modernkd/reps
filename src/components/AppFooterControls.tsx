@@ -7,15 +7,19 @@ import styles from "./styles/AppFooterControls.module.css";
 type AppFooterControlsProps = {
   language: AppLanguage;
   theme: "light" | "dark";
+  isSignedIn?: boolean;
   onLanguageChange: (language: AppLanguage) => void;
   onToggleTheme: () => void;
+  onOpenAuth: () => void;
 };
 
 export function AppFooterControls({
   language,
   theme,
+  isSignedIn = false,
   onLanguageChange,
   onToggleTheme,
+  onOpenAuth,
 }: AppFooterControlsProps) {
   const copy = getCopy(language);
   const isDark = theme === "dark";
@@ -41,6 +45,14 @@ export function AppFooterControls({
           </nav>
 
           <div className={styles.controls}>
+            <button
+              type="button"
+              className={styles.accountButton}
+              onClick={onOpenAuth}
+            >
+              {isSignedIn ? copy.appHeader.account : copy.appHeader.login}
+            </button>
+
             <button
               type="button"
               className={styles.iconButton}
