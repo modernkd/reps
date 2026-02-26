@@ -197,7 +197,7 @@ export const Route = createFileRoute("/")({
   component: WorkoutDashboard,
 });
 
-function WorkoutDashboard() {
+export function WorkoutDashboard() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const reducedMotion = useReducedMotion();

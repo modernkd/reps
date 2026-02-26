@@ -1,10 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { RouterProvider, createRouter, createMemoryHistory, createRootRoute } from "@tanstack/react-router";
-import { Route } from "./index";
+import { Route, WorkoutDashboard } from "./index";
 import * as cloudSync from "../lib/cloudSync";
 import {
-  exportWorkoutDataSnapshot,
   workoutsCollection,
   addWorkout,
   clearAllUncompletedSessions,
@@ -21,24 +19,42 @@ vi.mock("../lib/cloudSync", () => {
   };
 });
 
-// Since Index calls ensureDefaultWorkoutTypes etc., we might need to wait for them.
+vi.mock("../lib/useReducedMotion", () => ({
+  useReducedMotion: () => false,
+}));
+
+
+// Polyfills for Recharts and other UI components in JSDOM
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
+
 describe("WorkoutDashboard Cloud Sync Integrations", () => {
-  let router: ReturnType<typeof createRouter>;
   let unsubscribeMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     
-    // Set up a mock router
-    const rootRoute = createRootRoute();
-    const indexRoute = Route.update({ getParentRoute: () => rootRoute });
-    const routeTree = rootRoute.addChildren([indexRoute]);
-    
-    const memoryHistory = createMemoryHistory({
-      initialEntries: ["/"],
-    });
-    
-    router = createRouter({ routeTree, history: memoryHistory });
+    // Mock the router hooks on the Route object directly
+    vi.spyOn(Route, "useSearch").mockReturnValue({});
+    vi.spyOn(Route, "useNavigate").mockReturnValue(vi.fn());
 
     vi.mocked(cloudSync.isCloudSyncConfigured).mockReturnValue(true);
     unsubscribeMock = vi.fn();
@@ -65,7 +81,7 @@ describe("WorkoutDashboard Cloud Sync Integrations", () => {
       notes: "local data",
     });
 
-    const mockUser = { id: "test-user-1", email: "test@example.com" };
+    const mockUser = { id: "test-user-1", email: "test@example.com" } as any;
     
     // Simulating the user already being signed in on mount
     vi.mocked(cloudSync.getCurrentCloudUser).mockResolvedValue(mockUser);
@@ -73,7 +89,7 @@ describe("WorkoutDashboard Cloud Sync Integrations", () => {
     // pullCloudSnapshot throws an error!
     vi.mocked(cloudSync.pullCloudSnapshot).mockRejectedValue(new Error("Network Error"));
 
-    render(<RouterProvider router={router} />);
+    render(<WorkoutDashboard />);
 
     // Wait for the sync attempt
     await waitFor(() => {
@@ -105,14 +121,14 @@ describe("WorkoutDashboard Cloud Sync Integrations", () => {
       return unsubscribeMock;
     });
 
-    render(<RouterProvider router={router} />);
+    render(<WorkoutDashboard />);
 
     // Wait for the component to mount and subscribe
     await waitFor(() => {
       expect(authStateCallback).toBeTruthy();
     });
 
-    const mockUser = { id: "test-user-new", email: "new@example.com" };
+    const mockUser = { id: "test-user-new", email: "new@example.com" } as any;
 
     // Remote snapshot is completely empty! 
     vi.mocked(cloudSync.pullCloudSnapshot).mockResolvedValue({ snapshot: null, updatedAt: null });
@@ -146,11 +162,11 @@ describe("WorkoutDashboard Cloud Sync Integrations", () => {
       return unsubscribeMock;
     });
 
-    const mockUser = { id: "test-user-same", email: "same@example.com" };
+    const mockUser = { id: "test-user-same", email: "same@example.com" } as any;
     vi.mocked(cloudSync.getCurrentCloudUser).mockResolvedValue(mockUser);
     vi.mocked(cloudSync.pullCloudSnapshot).mockResolvedValue({ snapshot: null, updatedAt: null });
 
-    render(<RouterProvider router={router} />);
+    render(<WorkoutDashboard />);
 
     // 1. Initial mount triggersgetCurrentCloudUser hydration
     await waitFor(() => {
@@ -168,3 +184,4 @@ describe("WorkoutDashboard Cloud Sync Integrations", () => {
     expect(cloudSync.pullCloudSnapshot).toHaveBeenCalledTimes(1);
   });
 });
+

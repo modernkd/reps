@@ -14,7 +14,7 @@ const config = defineConfig({
     !disableDevtools ? devtools() : null,
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
-    tanstackStart(),
+    !process.env.VITEST ? tanstackStart() : null,
     viteReact(),
   ].filter(Boolean),
   test: {
